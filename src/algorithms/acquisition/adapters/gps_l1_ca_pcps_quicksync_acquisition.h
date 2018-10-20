@@ -34,7 +34,6 @@
 #define GNSS_SDR_GPS_L1_CA_PCPS_QUICKSYNC_ACQUISITION_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/blocks/stream_to_vector.h>
 #include "gnss_synchro.h"
 #include "acquisition_interface.h"
@@ -54,7 +53,7 @@ class GpsL1CaPcpsQuickSyncAcquisition: public AcquisitionInterface
 public:
     GpsL1CaPcpsQuickSyncAcquisition(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GpsL1CaPcpsQuickSyncAcquisition();
 
@@ -108,11 +107,6 @@ public:
     void set_doppler_step(unsigned int doppler_step);
 
     /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
-
-    /*!
      * \brief Initializes acquisition algorithm.
      */
     void init();
@@ -132,7 +126,10 @@ public:
      */
     void reset();
 
-
+    /*!
+     * \brief If state = 1, it forces the block to start acquiring from the first sample
+     */
+    void set_state(int state);
 private:
     ConfigurationInterface* configuration_;
     pcps_quicksync_acquisition_cc_sptr acquisition_cc_;
@@ -146,7 +143,6 @@ private:
     float threshold_;
     unsigned int doppler_max_;
     unsigned int doppler_step_;
-    unsigned int shift_resolution_;
     unsigned int sampled_ms_;
     unsigned int max_dwells_;
     unsigned int folding_factor_;
@@ -159,8 +155,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 
     float calculate_threshold(float pfa);
 

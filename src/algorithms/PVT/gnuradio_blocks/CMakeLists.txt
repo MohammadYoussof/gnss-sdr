@@ -29,12 +29,14 @@ include_directories(
      ${CMAKE_SOURCE_DIR}/src/core/receiver
      ${CMAKE_SOURCE_DIR}/src/algorithms/PVT/libs
      ${ARMADILLO_INCLUDE_DIRS}
+     ${Boost_INCLUDE_DIRS}
      ${GLOG_INCLUDE_DIRS}
      ${GFlags_INCLUDE_DIRS}
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
 )
 
 file(GLOB PVT_GR_BLOCKS_HEADERS "*.h")
+list(SORT PVT_GR_BLOCKS_HEADERS)
 add_library(pvt_gr_blocks ${PVT_GR_BLOCKS_SOURCES} ${PVT_GR_BLOCKS_HEADERS})
 source_group(Headers FILES ${PVT_GR_BLOCKS_HEADERS})
 target_link_libraries(pvt_gr_blocks pvt_lib ${ARMADILLO_LIBRARIES})

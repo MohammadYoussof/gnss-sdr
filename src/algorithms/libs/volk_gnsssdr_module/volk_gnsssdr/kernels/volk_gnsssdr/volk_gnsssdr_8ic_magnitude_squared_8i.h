@@ -1,11 +1,11 @@
 /*!
  * \file volk_gnsssdr_8ic_magnitude_squared_8i.h
- * \brief Volk protokernel: calculates the magnitude squared of a 16 bits vector
+ * \brief VOLK_GNSSSDR kernel: calculates the magnitude squared of a 16 bits vector.
  * \authors <ul>
  *          <li> Andres Cecilia, 2014. a.cecilia.luque(at)gmail.com
  *          </ul>
  *
- * Volk protokernel that calculates the magnitude squared of a
+ * VOLK_GNSSSDR kernel that calculates the magnitude squared of a
  * 16 bits vector (8 bits the real part and 8 bits the imaginary part)
  * result = (real*real) + (imag*imag)
  *
@@ -34,25 +34,39 @@
  * -------------------------------------------------------------------------
  */
 
-#ifndef INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_u_H
-#define INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_u_H
+/*!
+ * \page volk_gnsssdr_8ic_magnitude_squared_8i
+ *
+ * \b Overview
+ *
+ * Calculates the magnitude squared of the complex data items in \p complexVector and stores the results in \p magnitudeVector
+ *
+ * <b>Dispatcher Prototype</b>
+ * \code
+ * void volk_gnsssdr_8ic_magnitude_squared_8i(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points);
+ * \endcode
+ *
+ * \b Inputs
+ * \li complexVector: The vector containing the complex input values
+ * \li num_points: The number of complex data points.
+ *
+ * \b Outputs
+ * \li magnitudeVector: The vector containing the real output values
+ *
+ */
 
-#include <inttypes.h>
-#include <stdio.h>
-#include <math.h>
+#ifndef INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_H
+#define INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_H
+
 
 #ifdef LV_HAVE_SSSE3
 #include <tmmintrin.h>
-/*!
- \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
- \param complexVector The vector containing the complex input values
- \param magnitudeVector The vector containing the real output values
- \param num_points The number of complex values in complexVector to be calculated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse3(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
-
+    unsigned int number;
+    unsigned int i;
     const char* complexVectorPtr = (char*)complexVector;
     char* magnitudeVectorPtr = magnitudeVector;
 
@@ -64,7 +78,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse3(char* magnitudeV
     maska = _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 14, 12, 10, 8, 6, 4, 2, 0);
     maskb = _mm_set_epi8(14, 12, 10, 8, 6, 4, 2, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
 
-    for(unsigned int number = 0;number < sse_iters; number++)
+    for(number = 0; number < sse_iters; number++)
         {
             avector = _mm_lddqu_si128((__m128i*)complexVectorPtr);
             avectorlo = _mm_unpacklo_epi8 (avector, zero);
@@ -91,7 +105,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse3(char* magnitudeV
             magnitudeVectorPtr += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points; ++i)
         {
             const char valReal = *complexVectorPtr++;
             const char valImag = *complexVectorPtr++;
@@ -102,12 +116,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse3(char* magnitudeV
 
 //#ifdef LV_HAVE_SSE
 //#include <xmmintrin.h>
-///*!
-// \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
-// \param complexVector The vector containing the complex input values
-// \param magnitudeVector The vector containing the real output values
-// \param num_points The number of complex values in complexVector to be calculated and stored into cVector
-// */
+//
 //static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse(float* magnitudeVector, const lv_32fc_t* complexVector, unsigned int num_points){
 //    unsigned int number = 0;
 //    const unsigned int quarterPoints = num_points / 4;
@@ -147,18 +156,13 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_sse3(char* magnitudeV
 //#endif /* LV_HAVE_SSE */
 
 #ifdef LV_HAVE_GENERIC
-/*!
- \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
- \param complexVector The vector containing the complex input values
- \param magnitudeVector The vector containing the real output values
- \param num_points The number of complex values in complexVector to be calculated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_magnitude_squared_8i_generic(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points)
 {
     const char* complexVectorPtr = (char*)complexVector;
     char* magnitudeVectorPtr = magnitudeVector;
-
-    for(unsigned int number = 0; number < num_points; number++)
+    unsigned int number;
+    for(number = 0; number < num_points; number++)
         {
             const char real = *complexVectorPtr++;
             const char imag = *complexVectorPtr++;
@@ -167,30 +171,18 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_generic(char* magnitude
 }
 #endif /* LV_HAVE_GENERIC */
 
-#endif /* INCLUDED_volk_gnsssdr_32fc_magnitude_32f_u_H */
-
-
-#ifndef INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_a_H
-#define INCLUDED_volk_gnsssdr_8ic_magnitude_squared_8i_a_H
-
-#include <inttypes.h>
-#include <stdio.h>
-#include <math.h>
 
 #ifdef LV_HAVE_SSSE3
 #include <tmmintrin.h>
-/*!
- \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
- \param complexVector The vector containing the complex input values
- \param magnitudeVector The vector containing the real output values
- \param num_points The number of complex values in complexVector to be calculated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse3(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
 
     const char* complexVectorPtr = (char*)complexVector;
     char* magnitudeVectorPtr = magnitudeVector;
+    unsigned int number;
+    unsigned int i;
 
     __m128i zero, result8;
     __m128i avector, avectorhi, avectorlo, avectorlomult, avectorhimult, aadded, maska;
@@ -200,7 +192,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse3(char* magnitudeV
     maska = _mm_set_epi8(0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 14, 12, 10, 8, 6, 4, 2, 0);
     maskb = _mm_set_epi8(14, 12, 10, 8, 6, 4, 2, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
 
-    for(unsigned int number = 0;number < sse_iters; number++)
+    for(number = 0; number < sse_iters; number++)
         {
             avector = _mm_load_si128((__m128i*)complexVectorPtr);
             avectorlo = _mm_unpacklo_epi8 (avector, zero);
@@ -227,7 +219,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse3(char* magnitudeV
             magnitudeVectorPtr += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points; ++i)
         {
             const char valReal = *complexVectorPtr++;
             const char valImag = *complexVectorPtr++;
@@ -238,12 +230,7 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse3(char* magnitudeV
 
 //#ifdef LV_HAVE_SSE
 //#include <xmmintrin.h>
-///*!
-// \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
-// \param complexVector The vector containing the complex input values
-// \param magnitudeVector The vector containing the real output values
-// \param num_points The number of complex values in complexVector to be calculated and stored into cVector
-// */
+//
 //static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse(float* magnitudeVector, const lv_32fc_t* complexVector, unsigned int num_points){
 //    unsigned int number = 0;
 //    const unsigned int quarterPoints = num_points / 4;
@@ -282,34 +269,9 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_sse3(char* magnitudeV
 //}
 //#endif /* LV_HAVE_SSE */
 
-#ifdef LV_HAVE_GENERIC
-/*!
- \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
- \param complexVector The vector containing the complex input values
- \param magnitudeVector The vector containing the real output values
- \param num_points The number of complex values in complexVector to be calculated and stored into cVector
- */
-static inline void volk_gnsssdr_8ic_magnitude_squared_8i_a_generic(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points)
-{
-    const char* complexVectorPtr = (char*)complexVector;
-    char* magnitudeVectorPtr = magnitudeVector;
-
-    for(unsigned int number = 0; number < num_points; number++)
-        {
-            const char real = *complexVectorPtr++;
-            const char imag = *complexVectorPtr++;
-            *magnitudeVectorPtr++ = (real*real) + (imag*imag);
-        }
-}
-#endif /* LV_HAVE_GENERIC */
 
 #ifdef LV_HAVE_ORC
-/*!
- \brief Calculates the magnitude squared of complexVector and stores the results in magnitudeVector
- \param complexVector The vector containing the complex input values
- \param magnitudeVector The vector containing the real output values
- \param num_points The number of complex values in complexVector to be calculated and stored into cVector
- */
+
 extern void volk_gnsssdr_8ic_magnitude_squared_8i_a_orc_impl(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points);
 static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_orc(char* magnitudeVector, const lv_8sc_t* complexVector, unsigned int num_points)
 {
@@ -317,4 +279,4 @@ static inline void volk_gnsssdr_8ic_magnitude_squared_8i_u_orc(char* magnitudeVe
 }
 #endif /* LV_HAVE_ORC */
 
-#endif /* INCLUDED_volk_gnsssdr_32fc_magnitude_32f_a_H */
+#endif /* INCLUDED_volk_gnsssdr_32fc_magnitude_32f_H */

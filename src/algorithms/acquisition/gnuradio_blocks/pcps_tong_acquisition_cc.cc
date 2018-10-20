@@ -16,7 +16,7 @@
  *  <li> If the test statistics exceeds the threshold, increment the Tong counter.
  *  <li>   Otherwise, decrement the Tong counter.
  *  <li> If the Tong counter is equal to a given maximum value, declare positive
- *  <li>   acquisition. If the Tong counter is equa to zero, declare negative
+ *  <li>   acquisition. If the Tong counter is equal to zero, declare negative
  *  <li>   acquisition. Otherwise, process the next block.
  *  </ol>
  *
@@ -53,8 +53,9 @@
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
+#include <volk_gnsssdr/volk_gnsssdr.h>
 #include "control_message_factory.h"
-#include "gnss_signal_processing.h"
+#include "GPS_L1_CA.h" //GPS_TWO_PI
 
 using google::LogMessage;
 
@@ -62,35 +63,36 @@ pcps_tong_acquisition_cc_sptr pcps_tong_make_acquisition_cc(
                               unsigned int sampled_ms, unsigned int doppler_max,
                               long freq, long fs_in, int samples_per_ms,
                               int samples_per_code, unsigned int tong_init_val,
-                              unsigned int tong_max_val, gr::msg_queue::sptr queue,
+                              unsigned int tong_max_val,  unsigned int tong_max_dwells,
                               bool dump, std::string dump_filename)
 {
     return pcps_tong_acquisition_cc_sptr(
             new pcps_tong_acquisition_cc(sampled_ms, doppler_max, freq, fs_in, samples_per_ms, samples_per_code,
-                                    tong_init_val, tong_max_val, queue, dump, dump_filename));
+                                    tong_init_val, tong_max_val, tong_max_dwells, dump, dump_filename));
 }
 
 pcps_tong_acquisition_cc::pcps_tong_acquisition_cc(
                          unsigned int sampled_ms, unsigned int doppler_max,
                          long freq, long fs_in, int samples_per_ms,
                          int samples_per_code, unsigned int tong_init_val,
-                         unsigned int tong_max_val, gr::msg_queue::sptr queue,
+                         unsigned int tong_max_val, unsigned int tong_max_dwells,
                          bool dump, std::string dump_filename) :
     gr::block("pcps_tong_acquisition_cc",
     gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
     gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
 {
+    this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0;    // SAMPLE COUNTER
     d_active = false;
     d_state = 0;
-    d_queue = queue;
     d_freq = freq;
     d_fs_in = fs_in;
     d_samples_per_ms = samples_per_ms;
     d_samples_per_code = samples_per_code;
     d_sampled_ms = sampled_ms;
-    d_well_count = 0;
+    d_dwell_count = 0;
     d_tong_max_val = tong_max_val;
+    d_tong_max_dwells = tong_max_dwells;
     d_tong_init_val = tong_init_val;
     d_tong_count = d_tong_init_val;
     d_doppler_max = doppler_max;
@@ -99,8 +101,8 @@ pcps_tong_acquisition_cc::pcps_tong_acquisition_cc(
     d_input_power = 0.0;
     d_num_doppler_bins = 0;
 
-    d_fft_codes = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_magnitude = static_cast<float*>(volk_malloc(d_fft_size * sizeof(float), volk_get_alignment()));
+    d_fft_codes = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_magnitude = static_cast<float*>(volk_gnsssdr_malloc(d_fft_size * sizeof(float), volk_gnsssdr_get_alignment()));
 
     // Direct FFT
     d_fft_if = new gr::fft::fft_complex(d_fft_size, true);
@@ -111,6 +113,17 @@ pcps_tong_acquisition_cc::pcps_tong_acquisition_cc(
     // For dumping samples into a file
     d_dump = dump;
     d_dump_filename = dump_filename;
+
+    d_doppler_resolution = 0;
+    d_threshold = 0;
+    d_doppler_step = 0;
+    d_grid_data = 0;
+    d_grid_doppler_wipeoffs = 0;
+    d_gnss_synchro = 0;
+    d_code_phase = 0;
+    d_doppler_freq = 0;
+    d_test_statistics = 0;
+    d_channel = 0;
 }
 
 pcps_tong_acquisition_cc::~pcps_tong_acquisition_cc()
@@ -119,15 +132,15 @@ pcps_tong_acquisition_cc::~pcps_tong_acquisition_cc()
         {
             for (unsigned int i = 0; i < d_num_doppler_bins; i++)
                 {
-                    volk_free(d_grid_doppler_wipeoffs[i]);
-                    volk_free(d_grid_data[i]);
+                    volk_gnsssdr_free(d_grid_doppler_wipeoffs[i]);
+                    volk_gnsssdr_free(d_grid_data[i]);
                 }
             delete[] d_grid_doppler_wipeoffs;
             delete[] d_grid_data;
         }
 
-    volk_free(d_fft_codes);
-    volk_free(d_magnitude);
+    volk_gnsssdr_free(d_fft_codes);
+    volk_gnsssdr_free(d_magnitude);
 
     delete d_ifft;
     delete d_fft_if;
@@ -150,6 +163,12 @@ void pcps_tong_acquisition_cc::set_local_code(std::complex<float> * code)
 
 void pcps_tong_acquisition_cc::init()
 {
+    d_gnss_synchro->Flag_valid_acquisition = false;
+    d_gnss_synchro->Flag_valid_symbol_output = false;
+    d_gnss_synchro->Flag_valid_pseudorange = false;
+    d_gnss_synchro->Flag_valid_word = false;
+    d_gnss_synchro->Flag_preamble = false;
+
     d_gnss_synchro->Acq_delay_samples = 0.0;
     d_gnss_synchro->Acq_doppler_hz = 0.0;
     d_gnss_synchro->Acq_samplestamp_samples = 0;
@@ -170,14 +189,15 @@ void pcps_tong_acquisition_cc::init()
     d_grid_data = new float*[d_num_doppler_bins];
     for (unsigned int doppler_index = 0; doppler_index < d_num_doppler_bins; doppler_index++)
         {
-            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
+            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
 
             int doppler = -static_cast<int>(d_doppler_max) + d_doppler_step * doppler_index;
+            float phase_step_rad = GPS_TWO_PI * (d_freq + doppler) / static_cast<float>(d_fs_in);
+            float _phase[1];
+            _phase[0] = 0;
+            volk_gnsssdr_s32f_sincos_32fc(d_grid_doppler_wipeoffs[doppler_index], - phase_step_rad, _phase, d_fft_size);
 
-            complex_exp_gen_conj(d_grid_doppler_wipeoffs[doppler_index],
-                                 d_freq + doppler, d_fs_in, d_fft_size);
-
-            d_grid_data[doppler_index] = static_cast<float*>(volk_malloc(d_fft_size * sizeof(float), volk_get_alignment()));
+            d_grid_data[doppler_index] = static_cast<float*>(volk_gnsssdr_malloc(d_fft_size * sizeof(float), volk_gnsssdr_get_alignment()));
 
             for (unsigned int i = 0; i < d_fft_size; i++)
                 {
@@ -186,9 +206,39 @@ void pcps_tong_acquisition_cc::init()
         }
 }
 
+void pcps_tong_acquisition_cc::set_state(int state)
+{
+    d_state = state;
+    if (d_state == 1)
+        {
+            d_gnss_synchro->Acq_delay_samples = 0.0;
+            d_gnss_synchro->Acq_doppler_hz = 0.0;
+            d_gnss_synchro->Acq_samplestamp_samples = 0;
+            d_dwell_count = 0;
+            d_tong_count = d_tong_init_val;
+            d_mag = 0.0;
+            d_input_power = 0.0;
+            d_test_statistics = 0.0;
+
+            for (unsigned int doppler_index = 0; doppler_index < d_num_doppler_bins; doppler_index++)
+                {
+                    for (unsigned int i = 0; i < d_fft_size; i++)
+                        {
+                            d_grid_data[doppler_index][i] = 0;
+                        }
+                }
+        }
+    else if (d_state == 0)
+        {}
+    else
+        {
+            LOG(ERROR) << "State can only be set to 0 or 1";
+        }
+}
+
 int pcps_tong_acquisition_cc::general_work(int noutput_items,
         gr_vector_int &ninput_items, gr_vector_const_void_star &input_items,
-        gr_vector_void_star &output_items)
+        gr_vector_void_star &output_items __attribute__((unused)))
 {
     int acquisition_message = -1; //0=STOP_CHANNEL 1=ACQ_SUCCEES 2=ACQ_FAIL
 
@@ -202,7 +252,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
                     d_gnss_synchro->Acq_delay_samples = 0.0;
                     d_gnss_synchro->Acq_doppler_hz = 0.0;
                     d_gnss_synchro->Acq_samplestamp_samples = 0;
-                    d_well_count = 0;
+                    d_dwell_count = 0;
                     d_tong_count = d_tong_init_val;
                     d_mag = 0.0;
                     d_input_power = 0.0;
@@ -229,7 +279,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
         {
             // initialize acquisition algorithm
             int doppler;
-            unsigned int indext = 0;
+            uint32_t indext = 0;
             float magt = 0.0;
             const gr_complex *in = (const gr_complex *)input_items[0]; //Get the input samples pointer
             float fft_normalization_factor = static_cast<float>(d_fft_size) * static_cast<float>(d_fft_size);
@@ -238,7 +288,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
 
             d_sample_counter += d_fft_size; // sample counter
 
-            d_well_count++;
+            d_dwell_count++;
 
             DLOG(INFO) << "Channel: " << d_channel
                     << " , doing acquisition of satellite: " << d_gnss_synchro->System << " "<< d_gnss_synchro->PRN
@@ -285,7 +335,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
                     volk_32f_x2_add_32f(d_grid_data[doppler_index], d_magnitude, d_grid_data[doppler_index], d_fft_size);
 
                     // Search maximum
-                    volk_32f_index_max_16u(&indext, d_grid_data[doppler_index], d_fft_size);
+                    volk_gnsssdr_32f_index_max_32u(&indext, d_grid_data[doppler_index], d_fft_size);
 
                     magt = d_grid_data[doppler_index][indext];
 
@@ -316,7 +366,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
             // 5- Compute the test statistics and compare to the threshold
             d_test_statistics = d_mag;
 
-            if (d_test_statistics > d_threshold*d_well_count)
+            if (d_test_statistics > d_threshold * d_dwell_count)
                 {
                     d_tong_count++;
                     if (d_tong_count == d_tong_max_val)
@@ -333,6 +383,10 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
                         }
                 }
 
+            if(d_dwell_count >= d_tong_max_dwells)
+                {
+                    d_state = 3; // Negative acquisition
+                }
             consume_each(1);
 
             break;
@@ -340,7 +394,7 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
 
     case 2:
         {
-            // 6.1- Declare positive acquisition using a message queue
+            // 6.1- Declare positive acquisition using a message port
             DLOG(INFO) << "positive acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -358,14 +412,14 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
             consume_each(ninput_items[0]);
 
             acquisition_message = 1;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
 
     case 3:
         {
-            // 6.2- Declare negative acquisition using a message queue
+            // 6.2- Declare negative acquisition using a message port
             DLOG(INFO) << "negative acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -383,11 +437,11 @@ int pcps_tong_acquisition_cc::general_work(int noutput_items,
             consume_each(ninput_items[0]);
 
             acquisition_message = 2;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
     }
 
-    return 0;
+    return noutput_items;
 }

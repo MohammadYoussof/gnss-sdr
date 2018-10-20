@@ -1,11 +1,11 @@
 /*!
  * \file volk_gnsssdr_8u_x2_multiply_8u.h
- * \brief Volk protokernel: multiplies unsigned char values
+ * \brief VOLK_GNSSSDR kernel: multiplies unsigned char values.
  * \authors <ul>
  *          <li> Andres Cecilia, 2014. a.cecilia.luque(at)gmail.com
  *          </ul>
  *
- * Volk protokernel that multiplies unsigned char values (8 bits data)
+ * VOLK_GNSSSDR kernel that multiplies unsigned char values (8 bits data)
  *
  * -------------------------------------------------------------------------
  *
@@ -32,51 +32,68 @@
  * -------------------------------------------------------------------------
  */
 
-#ifndef INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_u_H
-#define INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_u_H
+/*!
+ * \page volk_gnsssdr_8u_x2_multiply_8u
+ *
+ * \b Overview
+ *
+ * Multiplies two input vectors of unsigned char, point-by-point, storing the result in the third vector
+ *
+ * <b>Dispatcher Prototype</b>
+ * \code
+ * void volk_gnsssdr_8u_x2_multiply_8u(unsigned char* cChar, const unsigned char* aChar, const unsigned char* bChar, unsigned int num_points);
+ * \endcode
+ *
+ * \b Inputs
+ * \li aChar: One of the vectors to be multiplied
+ * \li bChar: The other vector to be multiplied
+ * \li num_points: The number of complex data points.
+ *
+ * \b Outputs
+ * \li cChar: The vector where the result will be stored
+ *
+ */
 
-#include <inttypes.h>
-#include <stdio.h>
+
+#ifndef INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_H
+#define INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_H
+
 
 #ifdef LV_HAVE_SSE3
 #include <pmmintrin.h>
-/*!
- \brief Multiplies the two input unsigned char values and stores their results in the third unsigned char
- \param cChar The unsigned char where the results will be stored
- \param aChar One of the unsigned char to be multiplied
- \param bChar One of the unsigned char to be multiplied
- \param num_points The number of unsigned char values in aChar and bChar to be multiplied together and stored into cChar
- */
+
 static inline void volk_gnsssdr_8u_x2_multiply_8u_u_sse3(unsigned char* cChar, const unsigned char* aChar, const unsigned char* bChar, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
+    unsigned int number;
+    unsigned int i;
 
     __m128i x, y, x1, x2, y1, y2, mult1, x1_mult_y1, x2_mult_y2, tmp, tmp1, tmp2, totalc;
     unsigned char* c = cChar;
     const unsigned char* a = aChar;
     const unsigned char* b = bChar;
 
-    for(unsigned int number = 0;number < sse_iters; number++)
+    for(number = 0; number < sse_iters; number++)
         {
             x = _mm_lddqu_si128((__m128i*)a);
             y = _mm_lddqu_si128((__m128i*)b);
 
             mult1 = _mm_set_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255);
-            x1 = _mm_srli_si128 (x, 1);
-            x1 = _mm_and_si128 (x1, mult1);
-            x2 = _mm_and_si128 (x, mult1);
+            x1 = _mm_srli_si128(x, 1);
+            x1 = _mm_and_si128(x1, mult1);
+            x2 = _mm_and_si128(x, mult1);
 
-            y1 = _mm_srli_si128 (y, 1);
-            y1 = _mm_and_si128 (y1, mult1);
-            y2 = _mm_and_si128 (y, mult1);
+            y1 = _mm_srli_si128(y, 1);
+            y1 = _mm_and_si128(y1, mult1);
+            y2 = _mm_and_si128(y, mult1);
 
-            x1_mult_y1 = _mm_mullo_epi16 (x1, y1);
-            x2_mult_y2 = _mm_mullo_epi16 (x2, y2);
+            x1_mult_y1 = _mm_mullo_epi16(x1, y1);
+            x2_mult_y2 = _mm_mullo_epi16(x2, y2);
 
-            tmp = _mm_and_si128 (x1_mult_y1, mult1);
-            tmp1 = _mm_slli_si128 (tmp, 1);
-            tmp2 = _mm_and_si128 (x2_mult_y2, mult1);
-            totalc = _mm_or_si128 (tmp1, tmp2);
+            tmp = _mm_and_si128(x1_mult_y1, mult1);
+            tmp1 = _mm_slli_si128(tmp, 1);
+            tmp2 = _mm_and_si128(x2_mult_y2, mult1);
+            totalc = _mm_or_si128(tmp1, tmp2);
 
             _mm_storeu_si128((__m128i*)c, totalc);
 
@@ -85,7 +102,7 @@ static inline void volk_gnsssdr_8u_x2_multiply_8u_u_sse3(unsigned char* cChar, c
             c += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points ; ++i)
         {
             *c++ = (*a++) * (*b++);
         }
@@ -93,75 +110,56 @@ static inline void volk_gnsssdr_8u_x2_multiply_8u_u_sse3(unsigned char* cChar, c
 #endif /* LV_HAVE_SSE3 */
 
 #ifdef LV_HAVE_GENERIC
-/*!
- \brief Multiplies the two input unsigned char values and stores their results in the third unisgned char
- \param cChar The unsigned char where the results will be stored
- \param aChar One of the unsigned char to be multiplied
- \param bChar One of the unsigned char to be multiplied
- \param num_points The number of unsigned char values in aChar and bChar to be multiplied together and stored into cChar
- */
+
 static inline void volk_gnsssdr_8u_x2_multiply_8u_generic(unsigned char* cChar, const unsigned char* aChar, const unsigned char* bChar, unsigned int num_points)
 {
     unsigned char* cPtr = cChar;
     const unsigned char* aPtr = aChar;
     const unsigned char* bPtr = bChar;
+    unsigned int number;
 
-    for(unsigned int number = 0; number < num_points; number++)
+    for(number = 0; number < num_points; number++)
         {
             *cPtr++ = (*aPtr++) * (*bPtr++);
         }
 }
 #endif /* LV_HAVE_GENERIC */
 
-#endif /* INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_u_H */
-
-
-#ifndef INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_a_H
-#define INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_a_H
-
-#include <inttypes.h>
-#include <stdio.h>
 
 #ifdef LV_HAVE_SSE3
 #include <pmmintrin.h>
 
-/*!
- \brief Multiplies the two input unsigned char values and stores their results in the third unisgned char
- \param cChar The unsigned char where the results will be stored
- \param aChar One of the unsigned char to be multiplied
- \param bChar One of the unsigned char to be multiplied
- \param num_points The number of unsigned char values in aChar and bChar to be multiplied together and stored into cChar
- */
 static inline void volk_gnsssdr_8u_x2_multiply_8u_a_sse3(unsigned char* cChar, const unsigned char* aChar, const unsigned char* bChar, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
-
+    unsigned int number;
+    unsigned int i;
     __m128i x, y, x1, x2, y1, y2, mult1, x1_mult_y1, x2_mult_y2, tmp, tmp1, tmp2, totalc;
     unsigned char* c = cChar;
     const unsigned char* a = aChar;
     const unsigned char* b = bChar;
 
-    for(unsigned int number = 0;number < sse_iters; number++)
+    for(number = 0; number < sse_iters; number++)
         {
             x = _mm_load_si128((__m128i*)a);
             y = _mm_load_si128((__m128i*)b);
 
             mult1 = _mm_set_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255);
-            x1 = _mm_srli_si128 (x, 1);
-            x1 = _mm_and_si128 (x1, mult1);
-            x2 = _mm_and_si128 (x, mult1);
+            x1 = _mm_srli_si128(x, 1);
+            x1 = _mm_and_si128(x1, mult1);
+            x2 = _mm_and_si128(x, mult1);
 
-            y1 = _mm_srli_si128 (y, 1);
-            y1 = _mm_and_si128 (y1, mult1);
-            y2 = _mm_and_si128 (y, mult1);
+            y1 = _mm_srli_si128(y, 1);
+            y1 = _mm_and_si128(y1, mult1);
+            y2 = _mm_and_si128(y, mult1);
 
-            x1_mult_y1 = _mm_mullo_epi16 (x1, y1);
-            x2_mult_y2 = _mm_mullo_epi16 (x2, y2);
+            x1_mult_y1 = _mm_mullo_epi16(x1, y1);
+            x2_mult_y2 = _mm_mullo_epi16(x2, y2);
 
-            tmp = _mm_and_si128 (x1_mult_y1, mult1);
-            tmp1 = _mm_slli_si128 (tmp, 1);
-            tmp2 = _mm_and_si128 (x2_mult_y2, mult1);
-            totalc = _mm_or_si128 (tmp1, tmp2);
+            tmp = _mm_and_si128(x1_mult_y1, mult1);
+            tmp1 = _mm_slli_si128(tmp, 1);
+            tmp2 = _mm_and_si128(x2_mult_y2, mult1);
+            totalc = _mm_or_si128(tmp1, tmp2);
 
             _mm_store_si128((__m128i*)c, totalc);
 
@@ -170,42 +168,16 @@ static inline void volk_gnsssdr_8u_x2_multiply_8u_a_sse3(unsigned char* cChar, c
             c += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points; ++i)
         {
             *c++ = (*a++) * (*b++);
         }
 }
 #endif /* LV_HAVE_SSE */
 
-#ifdef LV_HAVE_GENERIC
-/*!
- \brief Multiplies the two input unsigned char values and stores their results in the third unisgned char
- \param cChar The unsigned char where the results will be stored
- \param aChar One of the unsigned char to be multiplied
- \param bChar One of the unsigned char to be multiplied
- \param num_points The number of unsigned char values in aChar and bChar to be multiplied together and stored into cChar
- */
-static inline void volk_gnsssdr_8u_x2_multiply_8u_a_generic(unsigned char* cChar, const unsigned char* aChar, const unsigned char* bChar, unsigned int num_points)
-{
-    unsigned char* cPtr = cChar;
-    const unsigned char* aPtr = aChar;
-    const unsigned char* bPtr = bChar;
-
-    for(unsigned int number = 0; number < num_points; number++)
-        {
-            *cPtr++ = (*aPtr++) * (*bPtr++);
-        }
-}
-#endif /* LV_HAVE_GENERIC */
 
 #ifdef LV_HAVE_ORC
-/*!
- \brief Multiplies the two input unsigned char values and stores their results in the third unisgned char
- \param cChar The unsigned char where the results will be stored
- \param aChar One of the unsigned char to be multiplied
- \param bChar One of the unsigned char to be multiplied
- \param num_points The number of unsigned char values in aChar and bChar to be multiplied together and stored into cChar
- */
+
 extern void volk_gnsssdr_8u_x2_multiply_8u_a_orc_impl(unsigned char* cVector, const unsigned char* aVector, const unsigned char* bVector, unsigned int num_points);
 static inline void volk_gnsssdr_8u_x2_multiply_8u_u_orc(unsigned char* cVector, const unsigned char* aVector, const unsigned char* bVector, unsigned int num_points)
 {
@@ -213,4 +185,4 @@ static inline void volk_gnsssdr_8u_x2_multiply_8u_u_orc(unsigned char* cVector, 
 }
 #endif /* LV_HAVE_ORC */
 
-#endif /* INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_a_H */
+#endif /* INCLUDED_volk_gnsssdr_8u_x2_multiply_8u_H */

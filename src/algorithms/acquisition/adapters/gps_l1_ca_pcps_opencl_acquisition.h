@@ -33,7 +33,6 @@
 #define GNSS_SDR_GPS_L1_CA_PCPS_OPENCL_ACQUISITION_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/blocks/stream_to_vector.h>
 #include "gnss_synchro.h"
 #include "acquisition_interface.h"
@@ -52,7 +51,7 @@ class GpsL1CaPcpsOpenClAcquisition: public AcquisitionInterface
 public:
     GpsL1CaPcpsOpenClAcquisition(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GpsL1CaPcpsOpenClAcquisition();
 
@@ -106,11 +105,6 @@ public:
     void set_doppler_step(unsigned int doppler_step);
 
     /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
-
-    /*!
      * \brief Initializes acquisition algorithm.
      */
     void init();
@@ -143,7 +137,6 @@ private:
     float threshold_;
     unsigned int doppler_max_;
     unsigned int doppler_step_;
-    unsigned int shift_resolution_;
     unsigned int sampled_ms_;
     unsigned int max_dwells_;
     long fs_in_;
@@ -155,8 +148,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 
     float calculate_threshold(float pfa);
 };

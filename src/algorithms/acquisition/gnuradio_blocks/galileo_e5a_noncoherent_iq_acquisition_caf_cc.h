@@ -4,7 +4,7 @@
  *  Galileo E5a data and pilot Signals
  * \author Marc Sales, 2014. marcsales92(at)gmail.com
  * \based on work from:
- * 		<ul>
+ *          <ul>
  *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          <li> Marc Molina, 2013. marc.molina.pena@gmail.com
@@ -39,15 +39,10 @@
 #define GALILEO_E5A_NONCOHERENT_IQ_ACQUISITION_CAF_CC_H_
 
 #include <fstream>
-#include <queue>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "gnss_synchro.h"
 
 class galileo_e5a_noncoherentIQ_acquisition_caf_cc;
@@ -56,11 +51,11 @@ typedef boost::shared_ptr<galileo_e5a_noncoherentIQ_acquisition_caf_cc> galileo_
 
 galileo_e5a_noncoherentIQ_acquisition_caf_cc_sptr
 galileo_e5a_noncoherentIQ_make_acquisition_caf_cc(unsigned int sampled_ms,
-			 unsigned int max_dwells,
+             unsigned int max_dwells,
                          unsigned int doppler_max, long freq, long fs_in,
                          int samples_per_ms, int samples_per_code,
                          bool bit_transition_flag,
-                         gr::msg_queue::sptr queue, bool dump,
+                         bool dump,
                          std::string dump_filename,
                          bool both_signal_components_,
                          int CAF_window_hz_,
@@ -77,24 +72,24 @@ class galileo_e5a_noncoherentIQ_acquisition_caf_cc: public gr::block
 private:
     friend galileo_e5a_noncoherentIQ_acquisition_caf_cc_sptr
     galileo_e5a_noncoherentIQ_make_acquisition_caf_cc(
-	    unsigned int sampled_ms,
-	    unsigned int max_dwells,
+            unsigned int sampled_ms,
+            unsigned int max_dwells,
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
             bool bit_transition_flag,
-            gr::msg_queue::sptr queue, bool dump,
+            bool dump,
             std::string dump_filename,
             bool both_signal_components_,
             int CAF_window_hz_,
             int Zero_padding_);
 
     galileo_e5a_noncoherentIQ_acquisition_caf_cc(
-	    unsigned int sampled_ms,
-	    unsigned int max_dwells,
+            unsigned int sampled_ms,
+            unsigned int max_dwells,
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
             bool bit_transition_flag,
-            gr::msg_queue::sptr queue, bool dump,
+            bool dump,
             std::string dump_filename,
             bool both_signal_components_,
             int CAF_window_hz_,
@@ -138,8 +133,6 @@ private:
     float d_input_power;
     float d_test_statistics;
     bool d_bit_transition_flag;
-    gr::msg_queue::sptr d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     std::ofstream d_dump_file;
     bool d_active;
     int d_state;
@@ -204,6 +197,13 @@ public:
      }
 
      /*!
+      * \brief If set to 1, ensures that acquisition starts at the
+      * first available sample.
+      * \param state - int=1 forces start of acquisition
+      */
+     void set_state(int state);
+
+     /*!
       * \brief Set acquisition channel unique ID
       * \param channel - receiver channel.
       */
@@ -240,15 +240,6 @@ public:
          d_doppler_step = doppler_step;
      }
 
-
-     /*!
-      * \brief Set tracking channel internal queue.
-      * \param channel_internal_queue - Channel's internal blocks information queue.
-      */
-     void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-     {
-         d_channel_internal_queue = channel_internal_queue;
-     }
 
      /*!
       * \brief Parallel Code Phase Search Acquisition signal processing.

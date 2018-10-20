@@ -17,6 +17,9 @@
 # You should have received a copy of the GNU General Public License
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
+from __future__ import print_function
+
+import six
 
 from volk_gnsssdr_arch_defs import arch_dict
 
@@ -34,7 +37,7 @@ class machine_class:
             self.archs.append(arch)
             self.arch_names.append(arch_name)
         self.alignment = max(map(lambda a: a.alignment, self.archs))
-
+    
     def __repr__(self): return self.name
 
 def register_machine(name, archs):
@@ -70,8 +73,8 @@ for machine_xml in machines_xml:
         except: pass
     kwargs['archs'] = kwargs['archs'].split()
     #force kwargs keys to be of type str, not unicode for py25
-    kwargs = dict((str(k), v) for k, v in kwargs.iteritems())
+    kwargs = dict((str(k), v) for k, v in six.iteritems(kwargs))
     register_machine(**kwargs)
 
 if __name__ == '__main__':
-    print machines
+    print(machines)

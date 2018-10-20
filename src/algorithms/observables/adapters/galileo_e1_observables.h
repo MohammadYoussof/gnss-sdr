@@ -35,7 +35,6 @@
 #define GNSS_SDR_GALILEO_E1_OBSERVABLES_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "observables_interface.h"
 #include "galileo_e1_observables_cc.h"
 
@@ -48,11 +47,10 @@ class ConfigurationInterface;
 class GalileoE1Observables : public ObservablesInterface
 {
 public:
-	GalileoE1Observables(ConfigurationInterface* configuration,
-                       std::string role,
-                       unsigned int in_streams,
-                       unsigned int out_streams,
-                       boost::shared_ptr<gr::msg_queue> queue);
+    GalileoE1Observables(ConfigurationInterface* configuration,
+            std::string role,
+            unsigned int in_streams,
+            unsigned int out_streams);
     virtual ~GalileoE1Observables();
     std::string role()
     {
@@ -82,12 +80,10 @@ public:
 private:
     galileo_e1_observables_cc_sptr observables_;
     bool dump_;
-    unsigned int fs_in_;
     std::string dump_filename_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
 };
 
 #endif

@@ -38,6 +38,7 @@
 #include <exception>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <volk/volk.h>
 #include "gnss_sdr_valve.h"
 #include "configuration_interface.h"
 
@@ -45,18 +46,20 @@ using google::LogMessage;
 
 
 DEFINE_string(signal_source, "-",
-		"If defined, path to the file containing the signal samples (overrides the configuration file)");
+        "If defined, path to the file containing the signal samples (overrides the configuration file)");
 
 
 FileSignalSource::FileSignalSource(ConfigurationInterface* configuration,
         std::string role, unsigned int in_streams, unsigned int out_streams,
         boost::shared_ptr<gr::msg_queue> queue) :
-		                role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
+                        role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
 {
     std::string default_filename = "./example_capture.dat";
     std::string default_item_type = "short";
     std::string default_dump_filename = "./my_capture.dat";
 
+    double default_seconds_to_skip = 0.0;
+    size_t header_size = 0;
     samples_ = configuration->property(role + ".samples", 0);
     sampling_frequency_ = configuration->property(role + ".sampling_frequency", 0);
     filename_ = configuration->property(role + ".filename", default_filename);
@@ -70,7 +73,12 @@ FileSignalSource::FileSignalSource(ConfigurationInterface* configuration,
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_filename);
     enable_throttle_control_ = configuration->property(role + ".enable_throttle_control", false);
     std::string s = "InputFilter";
-    double IF = configuration->property(s + ".IF", 0.0);
+    //double IF = configuration->property(s + ".IF", 0.0);
+    double seconds_to_skip = configuration->property(role + ".seconds_to_skip", default_seconds_to_skip );
+    header_size = configuration->property( role + ".header_size", 0 );
+    long samples_to_skip = 0;
+
+    bool is_complex = false;
 
     if (item_type_.compare("gr_complex") == 0)
         {
@@ -82,11 +90,21 @@ FileSignalSource::FileSignalSource(ConfigurationInterface* configuration,
         }
     else if (item_type_.compare("short") == 0)
         {
-            item_size_ = sizeof(short int);
+            item_size_ = sizeof(int16_t);
+        }
+    else if (item_type_.compare("ishort") == 0)
+        {
+            item_size_ = sizeof(int16_t);
+            is_complex = true;
         }
     else if (item_type_.compare("byte") == 0)
         {
-    		item_size_ = sizeof(char);
+            item_size_ = sizeof(int8_t);
+        }
+    else if (item_type_.compare("ibyte") == 0)
+        {
+            item_size_ = sizeof(int8_t);
+            is_complex = true;
         }
     else
         {
@@ -97,6 +115,30 @@ FileSignalSource::FileSignalSource(ConfigurationInterface* configuration,
     try
     {
             file_source_ = gr::blocks::file_source::make(item_size_, filename_.c_str(), repeat_);
+
+            if( seconds_to_skip > 0 )
+            {
+                samples_to_skip = static_cast< long >(
+                        seconds_to_skip * sampling_frequency_ );
+
+                if( is_complex )
+                {
+                    samples_to_skip *= 2;
+                }
+            }
+            if( header_size > 0 )
+            {
+                samples_to_skip += header_size;
+            }
+
+            if( samples_to_skip > 0 )
+            {
+                LOG(INFO) << "Skipping " << samples_to_skip << " samples of the input file";
+                if( not file_source_->seek( samples_to_skip, SEEK_SET ) )
+                {
+                    LOG(INFO) << "Error skipping bytes!";
+                }
+            }
 
     }
     catch (const std::exception &e)
@@ -153,30 +195,35 @@ FileSignalSource::FileSignalSource(ConfigurationInterface* configuration,
             if (file.is_open())
                 {
                     size = file.tellg();
-                    DLOG(INFO) << "Total samples in the file= " << floor((double)size / (double)item_size());
+                    DLOG(INFO) << "Total samples in the file= " << floor(static_cast<double>(size) / static_cast<double>(item_size()));
                 }
             else
                 {
                     std::cout << "file_signal_source: Unable to open the samples file " << filename_.c_str() << std::endl;
                     LOG(ERROR) << "file_signal_source: Unable to open the samples file " << filename_.c_str();
                 }
+            std::streamsize ss = std::cout.precision();
             std::cout << std::setprecision(16);
-            std::cout << "Processing file " << filename_ << ", which contains " << (double)size << " [bytes]" << std::endl;
+            std::cout << "Processing file " << filename_ << ", which contains " << static_cast<double>(size) << " [bytes]" << std::endl;
+            std::cout.precision (ss);
 
             if (size > 0)
                 {
-                    samples_ = floor((double)size / (double)item_size() - ceil(0.002 * (double)sampling_frequency_)); //process all the samples available in the file excluding at least the last 1 ms
+                    long bytes_to_skip = samples_to_skip*item_size_;
+                    long bytes_to_process = static_cast<long>(size) - bytes_to_skip;
+                    samples_ = floor(static_cast<double>(bytes_to_process) / static_cast<double>(item_size()) - ceil(0.002 * static_cast<double>(sampling_frequency_))); //process all the samples available in the file excluding at least the last 1 ms
                 }
         }
 
     CHECK(samples_ > 0) << "File does not contain enough samples to process.";
     double signal_duration_s;
-    signal_duration_s = (double)samples_ * ( 1 /(double)sampling_frequency_);
+    signal_duration_s = static_cast<double>(samples_) * ( 1 / static_cast<double>(sampling_frequency_));
 
-    if ((item_type_.compare("gr_complex") != 0) && (IF < 1e6) )  // if IF < BW/2, signal is complex (interleaved)
+    if( is_complex )
         {
-            signal_duration_s /= 2;
+            signal_duration_s /= 2.0;
         }
+
     DLOG(INFO) << "Total number samples to be processed= " << samples_ << " GNSS signal duration= " << signal_duration_s << " [s]";
     std::cout << "GNSS signal recorded time to be processed: " << signal_duration_s << " [s]" << std::endl;
 

@@ -1,11 +1,11 @@
 /*!
  * \file volk_gnsssdr_8ic_conjugate_8ic.h
- * \brief Volk protokernel: calculates the conjugate of a 16 bits vector
+ * \brief VOLK_GNSSSDR kernel: calculates the conjugate of a 16 bits vector.
  * \authors <ul>
  *          <li> Andres Cecilia, 2014. a.cecilia.luque(at)gmail.com
  *          </ul>
  *
- * Volk protokernel that calculates the conjugate of a 
+ * VOLK_GNSSSDR kernel that calculates the conjugate of a
  * 16 bits vector (8 bits the real part and 8 bits the imaginary part)
  *
  * -------------------------------------------------------------------------
@@ -33,25 +33,39 @@
  * -------------------------------------------------------------------------
  */
 
-#ifndef INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_u_H
-#define INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_u_H
+/*!
+ * \page volk_gnsssdr_8ic_conjugate_8ic
+ *
+ * \b Overview
+ *
+ * Takes the conjugate of a complex unsigned char vector.
+ *
+ * <b>Dispatcher Prototype</b>
+ * \code
+ * void volk_gnsssdr_8ic_conjugate_8ic(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points);
+ * \endcode
+ *
+ * \b Inputs
+ * \li aVector: Vector of complex items to be conjugated
+ * \li num_points: The number of complex data points.
+ *
+ * \b Outputs
+ * \li cVector: The vector where the result will be stored
+ *
+ */
 
-#include <inttypes.h>
-#include <stdio.h>
+#ifndef INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_H
+#define INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_H
+
 #include <volk_gnsssdr/volk_gnsssdr_complex.h>
 
 #ifdef LV_HAVE_AVX
 #include <immintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_u_avx(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
 
@@ -60,7 +74,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_avx(lv_8sc_t* cVector, const
     __m256 conjugator1 = _mm256_castsi256_ps(_mm256_setr_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255));
     __m128i conjugator2 = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm256_loadu_ps((float*)a);
             tmp = _mm256_xor_ps(tmp, conjugator1);
@@ -76,32 +90,28 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_avx(lv_8sc_t* cVector, const
             c += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
 }
 #endif /* LV_HAVE_AVX */
 
+
 #ifdef LV_HAVE_SSSE3
 #include <tmmintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_u_ssse3(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 8;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
     __m128i tmp;
 
     __m128i conjugator = _mm_setr_epi8(1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm_lddqu_si128((__m128i*)a);
             tmp = _mm_sign_epi8(tmp, conjugator);
@@ -110,7 +120,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_ssse3(lv_8sc_t* cVector, con
             c += 8;
         }
 
-    for (unsigned int i = 0; i<(num_points % 8); ++i)
+    for (i = sse_iters * 8; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
@@ -118,18 +128,14 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_ssse3(lv_8sc_t* cVector, con
 }
 #endif /* LV_HAVE_SSSE3 */
 
+
 #ifdef LV_HAVE_SSE3
 #include <pmmintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_u_sse3(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 8;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
     __m128i tmp;
@@ -137,7 +143,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_sse3(lv_8sc_t* cVector, cons
     __m128i conjugator1 = _mm_setr_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255);
     __m128i conjugator2 = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm_lddqu_si128((__m128i*)a);
             tmp = _mm_xor_si128(tmp, conjugator1);
@@ -147,7 +153,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_sse3(lv_8sc_t* cVector, cons
             c += 8;
         }
 
-    for (unsigned int i = 0; i<(num_points % 8); ++i)
+    for (i = sse_iters * 8; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
@@ -155,18 +161,14 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_sse3(lv_8sc_t* cVector, cons
 }
 #endif /* LV_HAVE_SSE3 */
 
+
 #ifdef LV_HAVE_GENERIC
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_generic(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     lv_8sc_t* cPtr = cVector;
     const lv_8sc_t* aPtr = aVector;
-    unsigned int number = 0;
+    unsigned int number;
 
     for(number = 0; number < num_points; number++)
         {
@@ -175,28 +177,14 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_generic(lv_8sc_t* cVector, con
 }
 #endif /* LV_HAVE_GENERIC */
 
-#endif /* INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_u_H */
-
-
-#ifndef INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_a_H
-#define INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_a_H
-
-#include <inttypes.h>
-#include <stdio.h>
-#include <volk_gnsssdr/volk_gnsssdr_complex.h>
 
 #ifdef LV_HAVE_AVX
 #include <immintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_a_avx(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 16;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
 
@@ -205,7 +193,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_avx(lv_8sc_t* cVector, const
     __m256 conjugator1 = _mm256_castsi256_ps(_mm256_setr_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255));
     __m128i conjugator2 = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm256_load_ps((float*)a);
             tmp = _mm256_xor_ps(tmp, conjugator1);
@@ -221,32 +209,27 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_avx(lv_8sc_t* cVector, const
             c += 16;
         }
 
-    for (unsigned int i = 0; i<(num_points % 16); ++i)
+    for (i = sse_iters * 16; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
 }
 #endif /* LV_HAVE_AVX */
 
+
 #ifdef LV_HAVE_SSSE3
 #include <tmmintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_a_ssse3(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 8;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
     __m128i tmp;
-
     __m128i conjugator = _mm_setr_epi8(1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1, 1, -1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm_load_si128((__m128i*)a);
             tmp = _mm_sign_epi8(tmp, conjugator);
@@ -255,26 +238,21 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_ssse3(lv_8sc_t* cVector, con
             c += 8;
         }
 
-    for (unsigned int i = 0; i<(num_points % 8); ++i)
+    for (i = sse_iters * 8; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
-
 }
 #endif /* LV_HAVE_SSSE3 */
 
+
 #ifdef LV_HAVE_SSE3
 #include <pmmintrin.h>
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 static inline void volk_gnsssdr_8ic_conjugate_8ic_a_sse3(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
     const unsigned int sse_iters = num_points / 8;
-
+    unsigned int i;
     lv_8sc_t* c = cVector;
     const lv_8sc_t* a = aVector;
     __m128i tmp;
@@ -282,7 +260,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_sse3(lv_8sc_t* cVector, cons
     __m128i conjugator1 = _mm_setr_epi8(0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255);
     __m128i conjugator2 = _mm_setr_epi8(0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1);
 
-    for (unsigned int i = 0; i < sse_iters; ++i)
+    for (i = 0; i < sse_iters; ++i)
         {
             tmp = _mm_load_si128((__m128i*)a);
             tmp = _mm_xor_si128(tmp, conjugator1);
@@ -292,7 +270,7 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_sse3(lv_8sc_t* cVector, cons
             c += 8;
         }
 
-    for (unsigned int i = 0; i<(num_points % 8); ++i)
+    for (i = sse_iters * 8; i < num_points; ++i)
         {
             *c++ = lv_conj(*a++);
         }
@@ -300,33 +278,9 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_a_sse3(lv_8sc_t* cVector, cons
 }
 #endif /* LV_HAVE_SSE3 */
 
-#ifdef LV_HAVE_GENERIC
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
-static inline void volk_gnsssdr_8ic_conjugate_8ic_a_generic(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
-{
-    lv_8sc_t* cPtr = cVector;
-    const lv_8sc_t* aPtr = aVector;
-    unsigned int number = 0;
-
-    for(number = 0; number < num_points; number++)
-        {
-            *cPtr++ = lv_conj(*aPtr++);
-        }
-}
-#endif /* LV_HAVE_GENERIC */
 
 #ifdef LV_HAVE_ORC
-/*!
- \brief Takes the conjugate of an unsigned char vector.
- \param cVector The vector where the results will be stored
- \param aVector Vector to be conjugated
- \param num_points The number of unsigned char values in aVector to be conjugated and stored into cVector
- */
+
 extern void volk_gnsssdr_8ic_conjugate_8ic_a_orc_impl(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points);
 static inline void volk_gnsssdr_8ic_conjugate_8ic_u_orc(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
 {
@@ -334,4 +288,33 @@ static inline void volk_gnsssdr_8ic_conjugate_8ic_u_orc(lv_8sc_t* cVector, const
 }
 #endif /* LV_HAVE_ORC */
 
-#endif /* INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_a_H */
+
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void volk_gnsssdr_8ic_conjugate_8ic_neon(lv_8sc_t* cVector, const lv_8sc_t* aVector, unsigned int num_points)
+{
+    const unsigned int sse_iters = num_points / 8;
+    unsigned int i;
+    lv_8sc_t* c = cVector;
+    const lv_8sc_t* a = aVector;
+    int8x8x2_t a_val;
+
+    for (i = 0; i < sse_iters; ++i)
+        {
+            a_val = vld2_s8((const int8_t*)a);
+            __VOLK_GNSSSDR_PREFETCH(a + 16);
+            a_val.val[1] = vneg_s8(a_val.val[1]);
+            vst2_s8((int8_t*)c, a_val);
+            a += 8;
+            c += 8;
+        }
+
+    for (i = sse_iters * 8; i < num_points; ++i)
+        {
+            *c++ = lv_conj(*a++);
+        }
+}
+#endif /* LV_HAVE_NEON */
+
+#endif /* INCLUDED_volk_gnsssdr_8ic_conjugate_8ic_H */

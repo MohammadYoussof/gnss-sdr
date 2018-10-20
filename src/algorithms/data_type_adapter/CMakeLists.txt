@@ -1,3 +1,4 @@
+#
 # Copyright (C) 2012-2015  (see AUTHORS file for a list of contributors)
 #
 # This file is part of GNSS-SDR.
@@ -17,3 +18,5 @@
 #
 
 add_subdirectory(adapters)
+add_subdirectory(gnuradio_blocks)
+

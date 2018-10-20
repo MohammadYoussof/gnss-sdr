@@ -1,12 +1,12 @@
 /*!
- * \file galileo_e5a_dll_fll_pll_tracking.h
+ * \file galileo_e5a_dll_pll_tracking.h
  * \brief Adapts a code DLL + carrier PLL
  *  tracking block to a TrackingInterface for Galileo E5a signals
  * \brief Adapts a PCPS acquisition block to an AcquisitionInterface for
  *  Galileo E5a data and pilot Signals
  * \author Marc Sales, 2014. marcsales92(at)gmail.com
  * \based on work from:
- * 		<ul>
+ *          <ul>
  *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          </ul>
@@ -40,7 +40,6 @@
 #define GNSS_SDR_GALILEO_E5A_DLL_PLL_TRACKING_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "tracking_interface.h"
 #include "galileo_e5a_dll_pll_tracking_cc.h"
 
@@ -53,12 +52,10 @@ class ConfigurationInterface;
 class GalileoE5aDllPllTracking : public TrackingInterface
 {
 public:
-
     GalileoE5aDllPllTracking(ConfigurationInterface* configuration,
             std::string role,
             unsigned int in_streams,
-            unsigned int out_streams,
-            boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GalileoE5aDllPllTracking();
 
@@ -82,7 +79,6 @@ public:
     gr::basic_block_sptr get_left_block();
     gr::basic_block_sptr get_right_block();
 
-
     /*!
      * \brief Set tracking channel unique ID
      */
@@ -94,10 +90,6 @@ public:
      */
     void set_gnss_synchro(Gnss_Synchro* p_gnss_synchro);
 
-    /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
 
     void start_tracking();
 
@@ -108,8 +100,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 };
 
 #endif /* GNSS_SDR_GALILEO_E5A_DLL_PLL_TRACKING_H_ */

@@ -33,6 +33,7 @@
 
 #include "gnss_signal.h"
 
+
 /*!
  * \brief This is the class that contains the information that is shared
  * by the processing blocks.
@@ -49,16 +50,18 @@ public:
     double Acq_delay_samples;                  //!< Set by Acquisition processing block
     double Acq_doppler_hz;                     //!< Set by Acquisition processing block
     unsigned long int Acq_samplestamp_samples; //!< Set by Acquisition processing block
-    bool Flag_valid_acquisition;
+    bool Flag_valid_acquisition; //!< Set by Acquisition processing block
     //Tracking
     double Prompt_I;                //!< Set by Tracking processing block
     double Prompt_Q;                //!< Set by Tracking processing block
     double CN0_dB_hz;               //!< Set by Tracking processing block
     double Carrier_Doppler_hz;      //!< Set by Tracking processing block
     double Carrier_phase_rads;      //!< Set by Tracking processing block
-    double Code_phase_secs;         //!< Set by Tracking processing block
     double Tracking_timestamp_secs; //!< Set by Tracking processing block
-    bool Flag_valid_tracking;
+    double Rem_code_phase_secs;     //!< Set by Tracking processing block
+
+    bool Flag_valid_symbol_output; //!< Set by Tracking processing block
+    int correlation_length_ms; //!< Set by Tracking processing block
 
     //Telemetry Decoder
     double Prn_timestamp_ms;             //!< Set by Telemetry Decoder processing block

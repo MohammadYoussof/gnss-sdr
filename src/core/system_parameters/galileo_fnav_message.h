@@ -1,12 +1,12 @@
 /*!
  * \file galileo_fnav_message.h
  * \brief  Implementation of a Galileo F/NAV Data message
- *         as described in Galileo OS SIS ICD Issue 1.1 (Sept. 2010)
+ *         as described in Galileo OS SIS ICD Issue 1.2 (Nov. 2015)
  * \author Marc Sales, 2014. marcsales92(at)gmail.com
  * \based on work from:
- * 		<ul>
- *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
- *          </ul>
+ * <ul>
+ * <li> Javier Arribas, 2011. jarribas(at)cttc.es
+ * </ul>
  *
  *
  * -------------------------------------------------------------------------
@@ -37,16 +37,12 @@
 #ifndef GNSS_SDR_GALILEO_FNAV_MESSAGE_H_
 #define GNSS_SDR_GALILEO_FNAV_MESSAGE_H_
 
-#include <iostream>
-#include <map>
-#include <vector>
-#include <string>
-#include <algorithm>
+
 #include <bitset>
-#include <boost/assign.hpp>
-#include <boost/cstdint.hpp>  // for boost::uint16_t
-#include <cmath>
+#include <string>
+#include <vector>
 #include <utility>
+#include <boost/cstdint.hpp>  // for boost::uint16_t
 #include "galileo_ephemeris.h"
 #include "galileo_iono.h"
 #include "galileo_almanac.h"
@@ -55,8 +51,8 @@
 
 /*!
  * \brief This class handles the Galileo F/NAV Data message, as described in the
- * Galileo Open Service Signal in Space Interface Control Document (OS SIS ICD), Issue 1.1 (Sept 2010).
- * See http://ec.europa.eu/enterprise/policies/satnav/galileo/files/galileo-os-sis-icd-issue1-revision1_en.pdf
+ * Galileo Open Service Signal in Space Interface Control Document (OS SIS ICD), Issue 1.2 (Nov 2015).
+ * See https://www.gsc-europa.eu/system/files/galileo_documents/Galileo_OS_SIS_ICD.pdf
  */
 class Galileo_Fnav_Message
 {
@@ -96,7 +92,7 @@ public:
     bool flag_TOW_2;
     bool flag_TOW_3;
     bool flag_TOW_4;
-    bool flag_TOW_set; 	      //!< it is true when page 1,2,3 or 4 arrives
+    bool flag_TOW_set;           //!< it is true when page 1,2,3 or 4 arrives
     bool flag_utc_model;      //!< Flag indicating that utc model parameters (word 4) have been received
 
     bool flag_all_almanac;    //!< Flag indicating that all almanac have been received
@@ -127,7 +123,7 @@ public:
     double FNAV_E5ahs_1;
     double FNAV_WN_1;
     double FNAV_TOW_1;
-    double FNAV_E5advs_1;
+    bool FNAV_E5advs_1;
 
     // WORD 2 Ephemeris (1/3) and GST
     int FNAV_IODnav_2;
@@ -186,7 +182,7 @@ public:
     double FNAV_M0_1_5;
     double FNAV_af0_1_5;
     double FNAV_af1_1_5;
-    double FNAV_E5ahs_1_5;
+    unsigned int FNAV_E5ahs_1_5;
     int FNAV_SVID2_5;
     double FNAV_Deltaa12_2_5;
     double FNAV_e_2_5;

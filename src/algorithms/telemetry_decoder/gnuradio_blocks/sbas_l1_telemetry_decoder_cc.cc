@@ -40,41 +40,38 @@
 using google::LogMessage;
 
 // logging levels
-#define EVENT 2 	// logs important events which don't occur every block
-#define FLOW 3  	// logs the function calls of block processing functions
+#define EVENT 2     // logs important events which don't occur every block
+#define FLOW 3      // logs the function calls of block processing functions
 #define SAMP_SYNC 4 // about 1 log entry per sample -> high output
-#define LMORE 5 	//
+#define LMORE 5     //
 
 
 
 sbas_l1_telemetry_decoder_cc_sptr
-sbas_l1_make_telemetry_decoder_cc(Gnss_Satellite satellite, long if_freq, long fs_in, unsigned
-        int vector_length, boost::shared_ptr<gr::msg_queue> queue, bool dump)
+sbas_l1_make_telemetry_decoder_cc(Gnss_Satellite satellite, bool dump)
 {
-    return sbas_l1_telemetry_decoder_cc_sptr(new sbas_l1_telemetry_decoder_cc(satellite, if_freq,
-            fs_in, vector_length, queue, dump));
+    return sbas_l1_telemetry_decoder_cc_sptr(new sbas_l1_telemetry_decoder_cc(satellite, dump));
 }
 
 
 
 sbas_l1_telemetry_decoder_cc::sbas_l1_telemetry_decoder_cc(
         Gnss_Satellite satellite,
-        long if_freq,
-        long fs_in,
-        unsigned
-        int vector_length,
-        boost::shared_ptr<gr::msg_queue> queue,
         bool dump) :
                 gr::block("sbas_l1_telemetry_decoder_cc",
                 gr::io_signature::make(1, 1, sizeof(Gnss_Synchro)),
                 gr::io_signature::make(1, 1, sizeof(Gnss_Synchro)))
 {
+    // Telemetry Bit transition synchronization port out
+    this->message_port_register_out(pmt::mp("preamble_timestamp_s"));
+    // Ephemeris data port out
+    this->message_port_register_out(pmt::mp("telemetry"));
     // initialize internal vars
     d_dump = dump;
     d_satellite = Gnss_Satellite(satellite.get_system(), satellite.get_PRN());
     LOG(INFO) << "SBAS L1 TELEMETRY PROCESSING: satellite " << d_satellite;
-    d_fs_in = fs_in;
     d_block_size = d_samples_per_symbol * d_symbols_per_bit * d_block_size_in_bits;
+    d_channel = 0;
     set_output_multiple (1);
 }
 
@@ -97,13 +94,13 @@ void sbas_l1_telemetry_decoder_cc::forecast (int noutput_items, gr_vector_int &n
 
 
 
-int sbas_l1_telemetry_decoder_cc::general_work (int noutput_items, gr_vector_int &ninput_items,
-        gr_vector_const_void_star &input_items,	gr_vector_void_star &output_items)
+int sbas_l1_telemetry_decoder_cc::general_work (int noutput_items __attribute__((unused)), gr_vector_int &ninput_items __attribute__((unused)),
+        gr_vector_const_void_star &input_items,    gr_vector_void_star &output_items)
 {
     VLOG(FLOW) << "general_work(): " << "noutput_items=" << noutput_items << "\toutput_items real size=" << output_items.size() <<  "\tninput_items size=" << ninput_items.size() << "\tinput_items real size=" << input_items.size() << "\tninput_items[0]=" << ninput_items[0];
     // get pointers on in- and output gnss-synchro objects
     const Gnss_Synchro *in = (const Gnss_Synchro *)  input_items[0]; // input
-    Gnss_Synchro *out = (Gnss_Synchro *) output_items[0]; 	// output
+    Gnss_Synchro *out = (Gnss_Synchro *) output_items[0];     // output
 
     // store the time stamp of the first sample in the processed sample block
     double sample_stamp = in[0].Tracking_timestamp_secs;
@@ -236,7 +233,7 @@ void sbas_l1_telemetry_decoder_cc::sample_aligner::reset()
  */
 bool sbas_l1_telemetry_decoder_cc::sample_aligner::get_symbols(const std::vector<double> samples, std::vector<double> &symbols)
 {
-    double smpls[d_n_smpls_in_history];
+    double smpls[3] = { };
     double corr_diff;
     bool stand_by = true;
     double sym;
@@ -327,7 +324,7 @@ bool sbas_l1_telemetry_decoder_cc::symbol_aligner_and_decoder::get_bits(const st
     // fill two vectors with the two possible symbol alignments
     std::vector<double> symbols_vd1(symbols); // aligned symbol vector -> copy input symbol vector
     std::vector<double> symbols_vd2;  // shifted symbol vector -> add past sample in front of input vector
-    symbols_vd1.push_back(d_past_symbol);
+    symbols_vd2.push_back(d_past_symbol);
     for (std::vector<double>::const_iterator symbol_it = symbols.begin(); symbol_it != symbols.end() - 1; ++symbol_it)
         {
             symbols_vd2.push_back(*symbol_it);
@@ -523,26 +520,3 @@ void sbas_l1_telemetry_decoder_cc::crc_verifier::zerropad_front_and_convert_to_b
                 << std::setfill(' ') << std::resetiosflags(std::ios::hex);
 }
 
-
-void sbas_l1_telemetry_decoder_cc::set_raw_msg_queue(concurrent_queue<Sbas_Raw_Msg> *raw_msg_queue)
-{
-    sbas_telemetry_data.set_raw_msg_queue(raw_msg_queue);
-}
-
-
-void sbas_l1_telemetry_decoder_cc::set_iono_queue(concurrent_queue<Sbas_Ionosphere_Correction> *iono_queue)
-{
-    sbas_telemetry_data.set_iono_queue(iono_queue);
-}
-
-
-void sbas_l1_telemetry_decoder_cc::set_sat_corr_queue(concurrent_queue<Sbas_Satellite_Correction> *sat_corr_queue)
-{
-    sbas_telemetry_data.set_sat_corr_queue(sat_corr_queue);
-}
-
-
-void sbas_l1_telemetry_decoder_cc::set_ephemeris_queue(concurrent_queue<Sbas_Ephemeris> *ephemeris_queue)
-{
-    sbas_telemetry_data.set_ephemeris_queue(ephemeris_queue);
-}

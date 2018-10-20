@@ -19,7 +19,8 @@
 
 set(RESAMPLER_GR_BLOCKS_SOURCES 
      direct_resampler_conditioner_cc.cc
-     direct_resampler_conditioner_ss.cc
+     direct_resampler_conditioner_cs.cc
+     direct_resampler_conditioner_cb.cc
 )
 
 include_directories(
@@ -27,9 +28,11 @@ include_directories(
      ${GLOG_INCLUDE_DIRS}
      ${GFlags_INCLUDE_DIRS}
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
+     ${VOLK_INCLUDE_DIRS}
 )
 
 file(GLOB RESAMPLER_GR_BLOCKS_HEADERS "*.h")
+list(SORT RESAMPLER_GR_BLOCKS_HEADERS)
 add_library(resampler_gr_blocks ${RESAMPLER_GR_BLOCKS_SOURCES} ${RESAMPLER_GR_BLOCKS_HEADERS})
 source_group(Headers FILES ${RESAMPLER_GR_BLOCKS_HEADERS})
 add_dependencies(resampler_gr_blocks glog-${glog_RELEASE})

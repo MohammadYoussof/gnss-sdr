@@ -32,32 +32,25 @@
 
 #include "gps_l1_ca_observables.h"
 #include "configuration_interface.h"
-#include "gps_l1_ca_observables_cc.h"
 #include <glog/logging.h>
+#include "GPS_L1_CA.h"
 
 using google::LogMessage;
 
 GpsL1CaObservables::GpsL1CaObservables(ConfigurationInterface* configuration,
         std::string role,
         unsigned int in_streams,
-        unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
+        unsigned int out_streams) :
                     role_(role),
                     in_streams_(in_streams),
-                    out_streams_(out_streams),
-                    queue_(queue)
+                    out_streams_(out_streams)
 {
-    int output_rate_ms;
-    output_rate_ms = configuration->property(role + ".output_rate_ms", 500);
     std::string default_dump_filename = "./observables.dat";
     DLOG(INFO) << "role " << role;
-    bool flag_averaging;
-    flag_averaging = configuration->property(role + ".flag_averaging", false);
     dump_ = configuration->property(role + ".dump", false);
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_filename);
-    fs_in_ = configuration->property("GNSS-SDR.internal_fs_hz", 2048000);
-    observables_ = gps_l1_ca_make_observables_cc(in_streams_, queue_, dump_, dump_filename_, output_rate_ms, flag_averaging);
-    observables_->set_fs_in(fs_in_);
+    unsigned int history_deep = configuration->property(role + ".averaging_depth", GPS_L1_CA_HISTORY_DEEP);
+    observables_ = gps_l1_ca_make_observables_cc(in_streams_, dump_, dump_filename_, history_deep);
     DLOG(INFO) << "pseudorange(" << observables_->unique_id() << ")";
 }
 
@@ -72,6 +65,7 @@ GpsL1CaObservables::~GpsL1CaObservables()
 
 void GpsL1CaObservables::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to connect internally
     DLOG(INFO) << "nothing to connect internally";
 }
@@ -80,6 +74,7 @@ void GpsL1CaObservables::connect(gr::top_block_sptr top_block)
 
 void GpsL1CaObservables::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to disconnect
 }
 
@@ -98,4 +93,3 @@ gr::basic_block_sptr GpsL1CaObservables::get_right_block()
 {
     return observables_;
 }
-

@@ -34,6 +34,7 @@
 #include <iostream>
 #include <complex>
 #include <glog/logging.h>
+#include <volk/volk.h>
 #include "configuration_interface.h"
 
 using google::LogMessage;
@@ -46,8 +47,18 @@ Pass_Through::Pass_Through(ConfigurationInterface* configuration, std::string ro
         out_streams_(out_streams)
 {
     std::string default_item_type = "gr_complex";
-    item_type_ = configuration->property(role + ".item_type", default_item_type);
+    std::string input_type = configuration->property(role + ".input_item_type", default_item_type);
+    std::string output_type = configuration->property(role + ".output_item_type", default_item_type);
+    if(input_type.compare(output_type) != 0)
+        {
+            LOG(WARNING) << "input_item_type and output_item_type are different in a Pass_Through implementation! Taking "
+                         << input_type
+                         << ", but item_size will supersede it.";
+        }
+
+    item_type_ = configuration->property(role + ".item_type", input_type);
     vector_size_ = configuration->property(role + ".vector_size", 1);
+
     if(item_type_.compare("float") == 0)
         {
             item_size_ = sizeof(float);
@@ -58,15 +69,27 @@ Pass_Through::Pass_Through(ConfigurationInterface* configuration, std::string ro
         }
     else if(item_type_.compare("short") == 0)
         {
-            item_size_ = sizeof(short);
+            item_size_ = sizeof(int16_t);
+        }
+    else if(item_type_.compare("ishort") == 0)
+        {
+            item_size_ = sizeof(int16_t);
+        }
+    else if(item_type_.compare("cshort") == 0)
+        {
+            item_size_ = sizeof(lv_16sc_t);
         }
     else if(item_type_.compare("byte") == 0)
         {
-            item_size_ = sizeof(char);
+            item_size_ = sizeof(int8_t);
+        }
+    else if(item_type_.compare("ibyte") == 0)
+        {
+            item_size_ = sizeof(int8_t);
         }
     else if(item_type_.compare("cbyte") == 0)
         {
-            item_size_ = sizeof(std::complex<unsigned char>);
+            item_size_ = sizeof(lv_8sc_t);
         }
     else
         {
@@ -86,6 +109,7 @@ Pass_Through::~Pass_Through()
 
 void Pass_Through::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     DLOG(INFO) << "nothing to connect internally";
 }
 
@@ -93,6 +117,7 @@ void Pass_Through::connect(gr::top_block_sptr top_block)
 
 void Pass_Through::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to disconnect
 }
 

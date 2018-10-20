@@ -10,7 +10,7 @@
  *  <li> Perform the FFT-based circular convolution (parallel time search)
  *  <li> Record the maximum peak and the associated synchronization parameters
  *  <li> Compute the test statistics and compare to the threshold
- *  <li> Declare positive or negative acquisition using a message queue
+ *  <li> Declare positive or negative acquisition using a message port
  *  </ol>
  *
  * Kay Borre book: K.Borre, D.M.Akos, N.Bertelsen, P.Rinder, and S.H.Jensen,
@@ -49,7 +49,6 @@
  */
 
 #include "pcps_opencl_acquisition_cc.h"
-#include <sys/time.h>
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -57,11 +56,11 @@
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
-#include "gnss_signal_processing.h"
+#include <volk_gnsssdr/volk_gnsssdr.h>
 #include "control_message_factory.h"
 #include "fft_base_kernels.h"
 #include "fft_internal.h"
-
+#include "GPS_L1_CA.h" //GPS_TWO_PI
 
 
 using google::LogMessage;
@@ -71,13 +70,13 @@ pcps_opencl_acquisition_cc_sptr pcps_make_opencl_acquisition_cc(
                                  unsigned int doppler_max, long freq, long fs_in,
                                  int samples_per_ms, int samples_per_code,
                                  bool bit_transition_flag,
-                                 gr::msg_queue::sptr queue, bool dump,
+                                 bool dump,
                                  std::string dump_filename)
 {
 
     return pcps_opencl_acquisition_cc_sptr(
             new pcps_opencl_acquisition_cc(sampled_ms, max_dwells, doppler_max, freq, fs_in, samples_per_ms,
-                                     samples_per_code, bit_transition_flag, queue, dump, dump_filename));
+                                     samples_per_code, bit_transition_flag, dump, dump_filename));
 }
 
 pcps_opencl_acquisition_cc::pcps_opencl_acquisition_cc(
@@ -85,17 +84,17 @@ pcps_opencl_acquisition_cc::pcps_opencl_acquisition_cc(
                          unsigned int doppler_max, long freq, long fs_in,
                          int samples_per_ms, int samples_per_code,
                          bool bit_transition_flag,
-                         gr::msg_queue::sptr queue, bool dump,
+                         bool dump,
                          std::string dump_filename) :
     gr::block("pcps_opencl_acquisition_cc",
     gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
     gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
 {
+    this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0;    // SAMPLE COUNTER
     d_active = false;
     d_state = 0;
     d_core_working = false;
-    d_queue = queue;
     d_freq = freq;
     d_fs_in = fs_in;
     d_samples_per_ms = samples_per_ms;
@@ -116,11 +115,11 @@ pcps_opencl_acquisition_cc::pcps_opencl_acquisition_cc(
     d_in_buffer = new gr_complex*[d_max_dwells];
     for (unsigned int i = 0; i < d_max_dwells; i++)
         {
-            d_in_buffer[i] = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
+            d_in_buffer[i] = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
         }
-    d_magnitude = static_cast<float*>(volk_malloc(d_fft_size * sizeof(float), volk_get_alignment()));
-    d_fft_codes = static_cast<gr_complex*>(volk_malloc(d_fft_size_pow2 * sizeof(gr_complex), volk_get_alignment()));
-    d_zero_vector = static_cast<gr_complex*>(volk_malloc((d_fft_size_pow2 - d_fft_size) * sizeof(gr_complex), volk_get_alignment()));
+    d_magnitude = static_cast<float*>(volk_gnsssdr_malloc(d_fft_size * sizeof(float), volk_gnsssdr_get_alignment()));
+    d_fft_codes = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size_pow2 * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_zero_vector = static_cast<gr_complex*>(volk_gnsssdr_malloc((d_fft_size_pow2 - d_fft_size) * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
 
     for (unsigned int i = 0; i < (d_fft_size_pow2-d_fft_size); i++)
         {
@@ -152,20 +151,20 @@ pcps_opencl_acquisition_cc::~pcps_opencl_acquisition_cc()
         {
             for (unsigned int i = 0; i < d_num_doppler_bins; i++)
                 {
-                    volk_free(d_grid_doppler_wipeoffs[i]);
+                    volk_gnsssdr_free(d_grid_doppler_wipeoffs[i]);
                 }
             delete[] d_grid_doppler_wipeoffs;
         }
 
     for (unsigned int i = 0; i < d_max_dwells; i++)
         {
-            volk_free(d_in_buffer[i]);
+            volk_gnsssdr_free(d_in_buffer[i]);
         }
     delete[] d_in_buffer;
 
-    volk_free(d_fft_codes);
-    volk_free(d_magnitude);
-    volk_free(d_zero_vector);
+    volk_gnsssdr_free(d_fft_codes);
+    volk_gnsssdr_free(d_magnitude);
+    volk_gnsssdr_free(d_zero_vector);
 
     if (d_opencl == 0)
         {
@@ -290,6 +289,12 @@ int pcps_opencl_acquisition_cc::init_opencl_environment(std::string kernel_filen
 
 void pcps_opencl_acquisition_cc::init()
 {
+    d_gnss_synchro->Flag_valid_acquisition = false;
+    d_gnss_synchro->Flag_valid_symbol_output = false;
+    d_gnss_synchro->Flag_valid_pseudorange = false;
+    d_gnss_synchro->Flag_valid_word = false;
+    d_gnss_synchro->Flag_preamble = false;
+
     d_gnss_synchro->Acq_delay_samples = 0.0;
     d_gnss_synchro->Acq_doppler_hz = 0.0;
     d_gnss_synchro->Acq_samplestamp_samples = 0;
@@ -314,11 +319,13 @@ void pcps_opencl_acquisition_cc::init()
 
     for (unsigned int doppler_index = 0; doppler_index < d_num_doppler_bins; doppler_index++)
         {
-            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
+            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
 
-            int doppler= -static_cast<int>(d_doppler_max) + d_doppler_step * doppler_index;
-            complex_exp_gen_conj(d_grid_doppler_wipeoffs[doppler_index],
-                                 d_freq + doppler, d_fs_in, d_fft_size);
+            int doppler = -static_cast<int>(d_doppler_max) + d_doppler_step * doppler_index;
+            float phase_step_rad = static_cast<float>(GPS_TWO_PI) * (d_freq + doppler) / static_cast<float>(d_fs_in);
+            float _phase[1];
+            _phase[0] = 0;
+            volk_gnsssdr_s32f_sincos_32fc(d_grid_doppler_wipeoffs[doppler_index], - phase_step_rad, _phase, d_fft_size);
 
             if (d_opencl == 0)
                 {
@@ -379,7 +386,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_volk()
 {
     // initialize acquisition algorithm
     int doppler;
-    unsigned int indext = 0;
+    uint32_t indext = 0;
     float magt = 0.0;
     float fft_normalization_factor = static_cast<float>(d_fft_size) * static_cast<float>(d_fft_size);
     gr_complex* in = d_in_buffer[d_well_count];
@@ -424,7 +431,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_volk()
 
             // Search maximum
             volk_32fc_magnitude_squared_32f(d_magnitude, d_ifft->get_outbuf(), d_fft_size);
-            volk_32f_index_max_16u(&indext, d_magnitude, d_fft_size);
+            volk_gnsssdr_32f_index_max_32u(&indext, d_magnitude, d_fft_size);
 
             // Normalize the maximum value to correct the scale factor introduced by FFTW
             magt = d_magnitude[indext] / (fft_normalization_factor * fft_normalization_factor);
@@ -501,7 +508,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
 {
     // initialize acquisition algorithm
     int doppler;
-    unsigned int indext = 0;
+    uint32_t indext = 0;
     float magt = 0.0;
     float fft_normalization_factor = (static_cast<float>(d_fft_size_pow2) * static_cast<float>(d_fft_size)); //This works, but I am not sure why.
     gr_complex* in = d_in_buffer[d_well_count];
@@ -586,7 +593,7 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
 
             // Search maximum
             // @TODO: find an efficient way to search the maximum with OpenCL in the GPU.
-            volk_32f_index_max_16u(&indext, d_magnitude, d_fft_size);
+            volk_gnsssdr_32f_index_max_32u(&indext, d_magnitude, d_fft_size);
 
             // Normalize the maximum value to correct the scale factor introduced by FFTW
             magt = d_magnitude[indext] / (fft_normalization_factor * fft_normalization_factor);
@@ -664,10 +671,32 @@ void pcps_opencl_acquisition_cc::acquisition_core_opencl()
 }
 
 
+void pcps_opencl_acquisition_cc::set_state(int state)
+{
+    d_state = state;
+    if (d_state == 1)
+        {
+            d_gnss_synchro->Acq_delay_samples = 0.0;
+            d_gnss_synchro->Acq_doppler_hz = 0.0;
+            d_gnss_synchro->Acq_samplestamp_samples = 0;
+            d_well_count = 0;
+            d_mag = 0.0;
+            d_input_power = 0.0;
+            d_test_statistics = 0.0;
+            d_in_dwell_count = 0;
+            d_sample_counter_buffer.clear();
+        }
+    else if (d_state == 0)
+        {}
+    else
+        {
+            LOG(ERROR) << "State can only be set to 0 or 1";
+        }
+}
 
 int pcps_opencl_acquisition_cc::general_work(int noutput_items,
         gr_vector_int &ninput_items, gr_vector_const_void_star &input_items,
-        gr_vector_void_star &output_items)
+        gr_vector_void_star &output_items __attribute__((unused)))
 {
     int acquisition_message = -1; //0=STOP_CHANNEL 1=ACQ_SUCCEES 2=ACQ_FAIL
     switch (d_state)
@@ -750,7 +779,7 @@ int pcps_opencl_acquisition_cc::general_work(int noutput_items,
 
     case 2:
         {
-            // Declare positive acquisition using a message queue
+            // Declare positive acquisition using a message port
             DLOG(INFO) << "positive acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -767,14 +796,14 @@ int pcps_opencl_acquisition_cc::general_work(int noutput_items,
             d_sample_counter += d_fft_size * ninput_items[0]; // sample counter
 
             acquisition_message = 1;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
 
     case 3:
         {
-            // Declare negative acquisition using a message queue
+            // Declare negative acquisition using a message port
             DLOG(INFO) << "negative acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -791,7 +820,7 @@ int pcps_opencl_acquisition_cc::general_work(int noutput_items,
             d_sample_counter += d_fft_size * ninput_items[0]; // sample counter
 
             acquisition_message = 2;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
@@ -799,5 +828,5 @@ int pcps_opencl_acquisition_cc::general_work(int noutput_items,
 
     consume_each(ninput_items[0]);
 
-    return 0;
+    return noutput_items;
 }

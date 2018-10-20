@@ -36,7 +36,9 @@
 #include "string_converter.h"
 
 InMemoryConfiguration::InMemoryConfiguration()
-{}
+{
+    std::unique_ptr<StringConverter> converter_(new StringConverter);
+}
 
 
 InMemoryConfiguration::~InMemoryConfiguration()
@@ -81,6 +83,13 @@ int InMemoryConfiguration::property(std::string property_name, int default_value
 
 
 unsigned int InMemoryConfiguration::property(std::string property_name, unsigned int default_value)
+{
+    std::string empty = "";
+    return converter_->convert(property(property_name, empty), default_value);
+}
+
+
+unsigned short InMemoryConfiguration::property(std::string property_name, unsigned short default_value)
 {
     std::string empty = "";
     return converter_->convert(property(property_name, empty), default_value);

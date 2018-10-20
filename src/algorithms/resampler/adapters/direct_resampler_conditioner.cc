@@ -30,12 +30,15 @@
  */
 
 #include "direct_resampler_conditioner.h"
+#include <cmath>
+#include <limits>
 #include <glog/logging.h>
 #include <gnuradio/blocks/file_sink.h>
+#include <volk/volk.h>
 #include "direct_resampler_conditioner_cc.h"
-#include "direct_resampler_conditioner_ss.h"
+#include "direct_resampler_conditioner_cs.h"
+#include "direct_resampler_conditioner_cb.h"
 #include "configuration_interface.h"
-
 
 using google::LogMessage;
 
@@ -46,8 +49,17 @@ DirectResamplerConditioner::DirectResamplerConditioner(
 {
     std::string default_item_type = "short";
     std::string default_dump_file = "./data/signal_conditioner.dat";
+    double fs_in;
+    fs_in = configuration->property("GNSS-SDR.internal_fs_hz", 2048000.0);
     sample_freq_in_ = configuration->property(role_ + ".sample_freq_in", (double)4000000.0);
-    sample_freq_out_ = configuration->property(role_ + ".sample_freq_out", (double)2048000.0);
+    sample_freq_out_ = configuration->property(role_ + ".sample_freq_out", fs_in);
+    if(std::fabs(fs_in - sample_freq_out_) > std::numeric_limits<double>::epsilon())
+        {
+            std::string aux_warn = "CONFIGURATION WARNING: Parameters GNSS-SDR.internal_fs_hz and "
+                    + role_ + ".sample_freq_out are not set to the same value!" ;
+            LOG(WARNING) << aux_warn;
+            std::cout << aux_warn << std::endl;
+        }
     item_type_ = configuration->property(role + ".item_type", default_item_type);
     dump_ = configuration->property(role + ".dump", false);
     DLOG(INFO) << "dump_ is " << dump_;
@@ -56,19 +68,29 @@ DirectResamplerConditioner::DirectResamplerConditioner(
     if (item_type_.compare("gr_complex") == 0)
         {
             item_size_ = sizeof(gr_complex);
-            resampler_ = direct_resampler_make_conditioner_cc(sample_freq_in_,
-                    sample_freq_out_);
+            resampler_ = direct_resampler_make_conditioner_cc(sample_freq_in_, sample_freq_out_);
             DLOG(INFO) << "sample_freq_in " << sample_freq_in_;
             DLOG(INFO) << "sample_freq_out" << sample_freq_out_;
             DLOG(INFO) << "Item size " << item_size_;
             DLOG(INFO) << "resampler(" << resampler_->unique_id() << ")";
-
         }
-    else if (item_type_.compare("short") == 0)
+    else if (item_type_.compare("cshort") == 0)
         {
-            item_size_ = sizeof(short);
-            resampler_ = direct_resampler_make_conditioner_ss(sample_freq_in_,
-                    sample_freq_out_);
+            item_size_ = sizeof(lv_16sc_t);
+            resampler_ = direct_resampler_make_conditioner_cs(sample_freq_in_, sample_freq_out_);
+            DLOG(INFO) << "sample_freq_in " << sample_freq_in_;
+            DLOG(INFO) << "sample_freq_out" << sample_freq_out_;
+            DLOG(INFO) << "Item size " << item_size_;
+            DLOG(INFO) << "resampler(" << resampler_->unique_id() << ")";
+        }
+    else if (item_type_.compare("cbyte") == 0)
+        {
+            item_size_ = sizeof(lv_8sc_t);
+            resampler_ = direct_resampler_make_conditioner_cb(sample_freq_in_, sample_freq_out_);
+            DLOG(INFO) << "sample_freq_in " << sample_freq_in_;
+            DLOG(INFO) << "sample_freq_out" << sample_freq_out_;
+            DLOG(INFO) << "Item size " << item_size_;
+            DLOG(INFO) << "resampler(" << resampler_->unique_id() << ")";
         }
     else
         {

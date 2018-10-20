@@ -33,7 +33,6 @@
 #define GNSS_SDR_GALILEO_E1_PCPS_CCCWSR_AMBIGUOUS_ACQUISITION_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/blocks/stream_to_vector.h>
 #include "gnss_synchro.h"
 #include "acquisition_interface.h"
@@ -51,7 +50,7 @@ class GalileoE1PcpsCccwsrAmbiguousAcquisition: public AcquisitionInterface
 public:
     GalileoE1PcpsCccwsrAmbiguousAcquisition(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GalileoE1PcpsCccwsrAmbiguousAcquisition();
 
@@ -105,11 +104,6 @@ public:
     void set_doppler_step(unsigned int doppler_step);
 
     /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
-
-    /*!
      * \brief Initializes acquisition algorithm.
      */
     void init();
@@ -126,6 +120,11 @@ public:
      */
     void reset();
 
+    /*!
+     * \brief If state = 1, it forces the block to start acquiring from the first sample
+     */
+    void set_state(int state);
+
 private:
     ConfigurationInterface* configuration_;
     pcps_cccwsr_acquisition_cc_sptr acquisition_cc_;
@@ -139,7 +138,6 @@ private:
     float threshold_;
     unsigned int doppler_max_;
     unsigned int doppler_step_;
-    unsigned int shift_resolution_;
     unsigned int sampled_ms_;
     unsigned int max_dwells_;
     long fs_in_;
@@ -152,8 +150,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
     float calculate_threshold(float pfa);
 };
 

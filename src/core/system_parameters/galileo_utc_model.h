@@ -33,12 +33,10 @@
 #ifndef GNSS_SDR_GALILEO_UTC_MODEL_H_
 #define GNSS_SDR_GALILEO_UTC_MODEL_H_
 
-#include "Galileo_E1.h"
-
 
 /*!
  * \brief This class is a storage for the GALILEO UTC MODEL data as described in Galileo ICD
- * http://ec.europa.eu/enterprise/policies/satnav/galileo/files/galileo-os-sis-icd-issue1-revision1_en.pdf
+ * https://www.gsc-europa.eu/system/files/galileo_documents/Galileo_OS_SIS_ICD.pdf
  * paragraph 5.1.7
  */
 class Galileo_Utc_Model

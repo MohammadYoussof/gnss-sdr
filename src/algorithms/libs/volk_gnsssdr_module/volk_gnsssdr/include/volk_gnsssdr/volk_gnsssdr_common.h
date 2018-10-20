@@ -21,6 +21,23 @@
  * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef INCLUDED_LIBVOLK_GNSSSDR_COMMON_H
+#define INCLUDED_LIBVOLK_GNSSSDR_COMMON_H
+
+////////////////////////////////////////////////////////////////////////
+// Cross-platform attribute macros not included in VOLK
+////////////////////////////////////////////////////////////////////////
+#if defined __GNUC__
+#  define __VOLK_GNSSSDR_PREFETCH(addr) __builtin_prefetch(addr)
+#  define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality) __builtin_prefetch(addr, rw, locality)
+#elif _MSC_VER
+#  define __VOLK_GNSSSDR_PREFETCH(addr)
+#  define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality)
+#else
+#  define __VOLK_GNSSSDR_PREFETCH(addr)
+#  define __VOLK_GNSSSDR_PREFETCH_LOCALITY(addr, rw, locality)
+#endif
+
 #ifndef INCLUDED_LIBVOLK_COMMON_H
 #define INCLUDED_LIBVOLK_COMMON_H
 
@@ -91,14 +108,15 @@
 #include <inttypes.h>
 
 #ifdef LV_HAVE_SSE
-#include <xmmintrin.h>
+#ifdef _WIN32
+#include <intrin.h>
+#else
+#include <x86intrin.h>
 #endif
-
-#ifdef LV_HAVE_SSE2
-#include <emmintrin.h>
 #endif
 
 union bit128{
+  uint8_t i8[16];
   uint16_t i16[8];
   uint32_t i[4];
   float f[4];
@@ -114,6 +132,22 @@ union bit128{
   #endif
 };
 
+union bit256{
+  uint8_t i8[32];
+  uint16_t i16[16];
+  uint32_t i[8];
+  float f[8];
+  double d[4];
+
+  #ifdef LV_HAVE_AVX
+  __m256 float_vec;
+  __m256i int_vec;
+  __m256d double_vec;
+  #endif
+};
+
 #define bit128_p(x) ((union bit128 *)(x))
+#define bit256_p(x) ((union bit256 *)(x))
 
 #endif /* INCLUDED_LIBVOLK_COMMON_H */
+#endif /* INCLUDED_LIBVOLK_GNSSSDR_COMMON_H */

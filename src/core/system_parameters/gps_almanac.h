@@ -32,8 +32,6 @@
 #ifndef GNSS_SDR_GPS_ALMANAC_H_
 #define GNSS_SDR_GPS_ALMANAC_H_
 
-#include "GPS_L1_CA.h"
-
 
 /*!
  * \brief This class is a storage for the GPS SV ALMANAC data as described in IS-GPS-200E
@@ -52,7 +50,7 @@ public:
     double d_OMEGA0;         //!< Longitude of Ascending Node of Orbit Plane at Weekly Epoch [semi-circles]
     double d_OMEGA;          //!< Argument of Perigee [semi-cicles]
     double d_OMEGA_DOT;      //!< Rate of Right Ascension [semi-circles/s]
-    int i_SV_health;	     // SV Health
+    int i_SV_health;         // SV Health
     double d_A_f0;           //!< Coefficient 0 of code phase offset model [s]
     double d_A_f1;           //!< Coefficient 1 of code phase offset model [s/s]
 

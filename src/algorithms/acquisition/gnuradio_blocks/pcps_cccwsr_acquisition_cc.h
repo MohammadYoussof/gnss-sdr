@@ -38,16 +38,10 @@
 #define GNSS_SDR_PCPS_CCCWSR_ACQUISITION_CC_H_
 
 #include <fstream>
-#include <queue>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/shared_array.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "gnss_synchro.h"
 
 
@@ -59,8 +53,7 @@ pcps_cccwsr_acquisition_cc_sptr
 pcps_cccwsr_make_acquisition_cc(unsigned int sampled_ms, unsigned int max_dwells,
                          unsigned int doppler_max, long freq, long fs_in,
                          int samples_per_ms, int samples_per_code,
-                         gr::msg_queue::sptr queue, bool dump,
-                         std::string dump_filename);
+                         bool dump, std::string dump_filename);
 
 /*!
  * \brief This class implements a Parallel Code Phase Search Acquisition with
@@ -73,15 +66,12 @@ private:
     pcps_cccwsr_make_acquisition_cc(unsigned int sampled_ms, unsigned int max_dwells,
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
-            gr::msg_queue::sptr queue, bool dump,
-            std::string dump_filename);
-
+            bool dump, std::string dump_filename);
 
     pcps_cccwsr_acquisition_cc(unsigned int sampled_ms, unsigned int max_dwells,
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
-            gr::msg_queue::sptr queue, bool dump,
-            std::string dump_filename);
+            bool dump, std::string dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int doppler_shift,
             int doppler_offset);
@@ -117,8 +107,6 @@ private:
     gr_complex* d_correlation_minus;
     float d_input_power;
     float d_test_statistics;
-    gr::msg_queue::sptr d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     std::ofstream d_dump_file;
     bool d_active;
     int d_state;
@@ -173,6 +161,13 @@ public:
      }
 
      /*!
+      * \brief If set to 1, ensures that acquisition starts at the
+      * first available sample.
+      * \param state - int=1 forces start of acquisition
+      */
+     void set_state(int state);
+
+     /*!
       * \brief Set acquisition channel unique ID
       * \param channel - receiver channel.
       */
@@ -207,15 +202,6 @@ public:
      void set_doppler_step(unsigned int doppler_step)
      {
          d_doppler_step = doppler_step;
-     }
-
-     /*!
-      * \brief Set tracking channel internal queue.
-      * \param channel_internal_queue - Channel's internal blocks information queue.
-      */
-     void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-     {
-         d_channel_internal_queue = channel_internal_queue;
      }
 
      /*!

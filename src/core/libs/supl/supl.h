@@ -4,6 +4,8 @@
 ** Copyright (c) 2007 Tatu Mannisto <tatu a-t tajuma d-o-t com>
 ** All rights reserved.
 ** Redistribution and modifications are permitted subject to BSD license.
+** Modifified by Carles Fernandez <carles d-o-t fernandez a-t cttc d-o-t es>
+** to make use of the gnutls library.
 **
 */
 
@@ -16,7 +18,20 @@
 #define EXPORT
 #endif
 
+#if USE_OPENSSL_FALLBACK
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <openssl/err.h>
+#else
+#include <gnutls/gnutls.h>
+#include <gnutls/compat.h>
+#include <gnutls/crypto.h>
+#include <gnutls/openssl.h>
+#include <gnutls/x509.h>
+#endif
+
 #include <PDU.h>
 #include <ULP-PDU.h>
 

@@ -4,7 +4,7 @@
  *  Galileo E5a data and pilot Signals
  * \author Marc Sales, 2014. marcsales92(at)gmail.com
  * \based on work from:
- * 		<ul>
+ *          <ul>
  *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          <li> Marc Molina, 2013. marc.molina.pena@gmail.com
@@ -36,12 +36,9 @@
  */
 
 #include "galileo_e5a_noncoherent_iq_acquisition_caf.h"
-#include <iostream>
 #include <boost/lexical_cast.hpp>
-#include <stdexcept>
 #include <boost/math/distributions/exponential.hpp>
 #include <glog/logging.h>
-#include <gnuradio/msg_queue.h>
 #include "galileo_e5_signal_processing.h"
 #include "Galileo_E5a.h"
 #include "configuration_interface.h"
@@ -50,9 +47,8 @@ using google::LogMessage;
 
 GalileoE5aNoncoherentIQAcquisitionCaf::GalileoE5aNoncoherentIQAcquisitionCaf(
         ConfigurationInterface* configuration, std::string role,
-        unsigned int in_streams, unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
-    role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
+        unsigned int in_streams, unsigned int out_streams) :
+    role_(role), in_streams_(in_streams), out_streams_(out_streams)
 {
     configuration_ = configuration;
     std::string default_item_type = "gr_complex";
@@ -60,38 +56,36 @@ GalileoE5aNoncoherentIQAcquisitionCaf::GalileoE5aNoncoherentIQAcquisitionCaf(
 
     DLOG(INFO) << "role " << role;
 
-    item_type_ = configuration_->property(role + ".item_type",
-	        default_item_type);
+    item_type_ = configuration_->property(role + ".item_type", default_item_type);
 
     fs_in_ = configuration_->property("GNSS-SDR.internal_fs_hz", 32000000);
-    if_ = configuration_->property(role + ".ifreq", 0);
+    if_ = configuration_->property(role + ".if", 0);
     dump_ = configuration_->property(role + ".dump", false);
-    shift_resolution_ = configuration_->property(role + ".doppler_max", 15);
+    doppler_max_ = configuration_->property(role + ".doppler_max", 5000);
     CAF_window_hz_ = configuration_->property(role + ".CAF_window_hz",0);
     Zero_padding = configuration_->property(role + ".Zero_padding",0);
     sampled_ms_ = configuration_->property(role + ".coherent_integration_time_ms", 1);
     if (sampled_ms_ > 3)
-	{
-	    sampled_ms_=3;
-	    DLOG(INFO) << "Coherent integration time should be 3 ms or less. Changing to 3ms ";
-	    std::cout<<"Too high coherent integration time. Changing to 3ms" << std::endl;
-	}
+        {
+            sampled_ms_ = 3;
+            DLOG(INFO) << "Coherent integration time should be 3 ms or less. Changing to 3ms ";
+            std::cout << "Too high coherent integration time. Changing to 3ms" << std::endl;
+        }
     if (Zero_padding > 0)
-	{
-	    sampled_ms_ = 2;
-	    DLOG(INFO) << "Zero padding activated. Changing to 1ms code + 1ms zero padding ";
-	    std::cout<<"Zero padding activated. Changing to 1ms code + 1ms zero padding" << std::endl;
-	}
+        {
+            sampled_ms_ = 2;
+            DLOG(INFO) << "Zero padding activated. Changing to 1ms code + 1ms zero padding ";
+            std::cout << "Zero padding activated. Changing to 1ms code + 1ms zero padding" << std::endl;
+        }
 
     max_dwells_ = configuration_->property(role + ".max_dwells", 1);
-
-    dump_filename_ = configuration_->property(role + ".dump_filename",
-            default_dump_filename);
+    dump_filename_ = configuration_->property(role + ".dump_filename", default_dump_filename);
+    bit_transition_flag_ = configuration_->property(role + ".bit_transition_flag", false);
 
     //--- Find number of samples per spreading code (1ms)-------------------------
-    code_length_ = round(fs_in_/ Galileo_E5a_CODE_CHIP_RATE_HZ*Galileo_E5a_CODE_LENGTH_CHIPS);
+    code_length_ = round(fs_in_ / Galileo_E5a_CODE_CHIP_RATE_HZ * Galileo_E5a_CODE_LENGTH_CHIPS);
 
-    vector_length_=code_length_ * sampled_ms_;
+    vector_length_ = code_length_ * sampled_ms_;
 
     codeI_= new gr_complex[vector_length_];
     codeQ_= new gr_complex[vector_length_];
@@ -99,29 +93,35 @@ GalileoE5aNoncoherentIQAcquisitionCaf::GalileoE5aNoncoherentIQAcquisitionCaf(
 
     std::string sig_ = configuration_->property("Channel.signal", std::string("5X"));
     if (sig_.at(0) == '5' && sig_.at(1) == 'X')
-	{
-	    both_signal_components = true;
-	}
+        {
+            both_signal_components = true;
+        }
     if (item_type_.compare("gr_complex") == 0)
         {
             item_size_ = sizeof(gr_complex);
             acquisition_cc_ = galileo_e5a_noncoherentIQ_make_acquisition_caf_cc(sampled_ms_, max_dwells_,
-                    shift_resolution_, if_, fs_in_, code_length_, code_length_,
-                    bit_transition_flag_, queue_, dump_, dump_filename_, both_signal_components, CAF_window_hz_,Zero_padding);
+                    doppler_max_, if_, fs_in_, code_length_, code_length_, bit_transition_flag_,
+                    dump_, dump_filename_, both_signal_components, CAF_window_hz_,Zero_padding);
         }
-        else
+    else
         {
-            LOG(WARNING) << item_type_
-                    << " unknown acquisition item type";
+            item_size_ = sizeof(gr_complex);
+            LOG(WARNING) << item_type_  << " unknown acquisition item type";
         }
 
+    channel_ = 0;
+    threshold_ = 0.0;
+    doppler_step_ = 0;
+    gnss_synchro_ = 0;
 }
+
 
 GalileoE5aNoncoherentIQAcquisitionCaf::~GalileoE5aNoncoherentIQAcquisitionCaf()
 {
-	delete[] codeI_;
-	delete[] codeQ_;
+    delete[] codeI_;
+    delete[] codeQ_;
 }
+
 
 void GalileoE5aNoncoherentIQAcquisitionCaf::set_channel(unsigned int channel)
 {
@@ -132,25 +132,26 @@ void GalileoE5aNoncoherentIQAcquisitionCaf::set_channel(unsigned int channel)
         }
 }
 
+
 void GalileoE5aNoncoherentIQAcquisitionCaf::set_threshold(float threshold)
 {
 
-	float pfa = configuration_->property(role_+ boost::lexical_cast<std::string>(channel_) + ".pfa", 0.0);
+    float pfa = configuration_->property(role_+ boost::lexical_cast<std::string>(channel_) + ".pfa", 0.0);
 
-	if(pfa==0.0) pfa = configuration_->property(role_+".pfa", 0.0);
+    if(pfa == 0.0) pfa = configuration_->property(role_ + ".pfa", 0.0);
 
-	if(pfa==0.0)
+    if(pfa == 0.0)
         {
             threshold_ = threshold;
         }
-	else
+    else
         {
             threshold_ = calculate_threshold(pfa);
         }
 
-	DLOG(INFO) <<"Channel "<<channel_<<" Threshold = " << threshold_;
+    DLOG(INFO) << "Channel " << channel_ << " Threshold = " << threshold_;
 
-	if (item_type_.compare("gr_complex") == 0)
+    if (item_type_.compare("gr_complex") == 0)
         {
             acquisition_cc_->set_threshold(threshold_);
         }
@@ -167,22 +168,13 @@ void GalileoE5aNoncoherentIQAcquisitionCaf::set_doppler_max(unsigned int doppler
         }
 }
 
+
 void GalileoE5aNoncoherentIQAcquisitionCaf::set_doppler_step(unsigned int doppler_step)
 {
     doppler_step_ = doppler_step;
     if (item_type_.compare("gr_complex") == 0)
         {
             acquisition_cc_->set_doppler_step(doppler_step_);
-        }
-}
-
-void GalileoE5aNoncoherentIQAcquisitionCaf::set_channel_queue(
-        concurrent_queue<int> *channel_internal_queue)
-{
-    channel_internal_queue_ = channel_internal_queue;
-    if (item_type_.compare("gr_complex") == 0)
-        {
-            acquisition_cc_->set_channel_queue(channel_internal_queue_);
         }
 }
 
@@ -217,64 +209,65 @@ void GalileoE5aNoncoherentIQAcquisitionCaf::init()
     set_local_code();
 }
 
+
 void GalileoE5aNoncoherentIQAcquisitionCaf::set_local_code()
 {
-	if (item_type_.compare("gr_complex")==0)
-	{
+    if (item_type_.compare("gr_complex") == 0)
+        {
+            std::complex<float>* codeI = new std::complex<float>[code_length_];
+            std::complex<float>* codeQ = new std::complex<float>[code_length_];
 
-		std::complex<float>* codeI = new std::complex<float>[code_length_];
-		std::complex<float>* codeQ = new std::complex<float>[code_length_];
+            if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
+                {
+                    char a[3];
+                    strcpy(a,"5I");
+                    galileo_e5_a_code_gen_complex_sampled(codeI, a,
+                            gnss_synchro_->PRN, fs_in_, 0);
 
-		if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
-		    {
-			char a[3];
-			strcpy(a,"5I");
-			galileo_e5_a_code_gen_complex_sampled(codeI, a,
-			                                      gnss_synchro_->PRN, fs_in_, 0);
+                    strcpy(a,"5Q");
+                    galileo_e5_a_code_gen_complex_sampled(codeQ, a,
+                            gnss_synchro_->PRN, fs_in_, 0);
+                }
+            else
+                {
+                    galileo_e5_a_code_gen_complex_sampled(codeI, gnss_synchro_->Signal,
+                            gnss_synchro_->PRN, fs_in_, 0);
+                }
+            // WARNING: 3ms are coherently integrated. Secondary sequence (1,1,1)
+            // is generated, and modulated in the 'block'.
+            if (Zero_padding == 0) // if no zero_padding
+                {
+                    for (unsigned int i = 0; i < sampled_ms_; i++)
+                        {
+                            memcpy(&(codeI_[i*code_length_]), codeI,
+                                    sizeof(gr_complex)*code_length_);
+                            if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
+                                {
+                                    memcpy(&(codeQ_[i*code_length_]), codeQ,
+                                            sizeof(gr_complex)*code_length_);
+                                }
+                        }
+                }
+            else
+                {
+                    // 1ms code + 1ms zero padding
+                    memcpy(&(codeI_[0]), codeI,
+                            sizeof(gr_complex)*code_length_);
+                    if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
+                        {
+                            memcpy(&(codeQ_[0]), codeQ,
+                                    sizeof(gr_complex)*code_length_);
+                        }
+                }
 
-			strcpy(a,"5Q");
-			galileo_e5_a_code_gen_complex_sampled(codeQ, a,
-			                                      gnss_synchro_->PRN, fs_in_, 0);
-		    }
-		else
-		    {
-			galileo_e5_a_code_gen_complex_sampled(codeI, gnss_synchro_->Signal,
-						              gnss_synchro_->PRN, fs_in_, 0);
-		    }
-		// WARNING: 3ms are coherently integrated. Secondary sequence (1,1,1)
-		// is generated, and modulated in the 'block'.
-		if (Zero_padding == 0) // if no zero_padding
-		    {
-			for (unsigned int i = 0; i < sampled_ms_; i++)
-			    {
-			        memcpy(&(codeI_[i*code_length_]), codeI,
-			             sizeof(gr_complex)*code_length_);
-				if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
-				    {
-					memcpy(&(codeQ_[i*code_length_]), codeQ,
-					       sizeof(gr_complex)*code_length_);
-				    }
-			    }
-		    }
-		else
-		    {
-			// 1ms code + 1ms zero padding
-		        memcpy(&(codeI_[0]), codeI,
-		             sizeof(gr_complex)*code_length_);
-			if (gnss_synchro_->Signal[0] == '5' && gnss_synchro_->Signal[1] == 'X')
-			    {
-				memcpy(&(codeQ_[0]), codeQ,
-				       sizeof(gr_complex)*code_length_);
-			    }
-		    }
+            acquisition_cc_->set_local_code(codeI_,codeQ_);
+            delete[] codeI;
+            delete[] codeQ;
 
-		acquisition_cc_->set_local_code(codeI_,codeQ_);
-		delete[] codeI;
-		delete[] codeQ;
-
-	}
+        }
 
 }
+
 
 void GalileoE5aNoncoherentIQAcquisitionCaf::reset()
 {
@@ -305,16 +298,25 @@ float GalileoE5aNoncoherentIQAcquisitionCaf::calculate_threshold(float pfa)
 }
 
 
+void GalileoE5aNoncoherentIQAcquisitionCaf::set_state(int state)
+{
+    acquisition_cc_->set_state(state);
+}
+
+
 void GalileoE5aNoncoherentIQAcquisitionCaf::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to connect internally
 }
 
 
 void GalileoE5aNoncoherentIQAcquisitionCaf::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to disconnect internally
 }
+
 
 gr::basic_block_sptr GalileoE5aNoncoherentIQAcquisitionCaf::get_left_block()
 {

@@ -49,7 +49,7 @@
  */
 
 #ifndef GNSS_SDR_RINEX_PRINTER_H_
-#define	GNSS_SDR_RINEX_PRINTER_H_
+#define GNSS_SDR_RINEX_PRINTER_H_
 
 #include <string>
 #include <fstream>
@@ -59,6 +59,7 @@
 #include <map>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include "gps_navigation_message.h"
+#include "gps_cnav_navigation_message.h"
 #include "galileo_navigation_message.h"
 #include "sbas_telemetry_data.h"
 #include "GPS_L1_CA.h"
@@ -77,113 +78,168 @@ public:
     /*!
      * \brief Default constructor. Creates GPS Navigation and Observables RINEX files and their headers
      */
-    Rinex_Printer();
+    Rinex_Printer(int version = 0);
 
     /*!
      * \brief Default destructor. Closes GPS Navigation and Observables RINEX files
      */
     ~Rinex_Printer();
 
-    std::ofstream obsFile ; //<! Output file stream for RINEX observation file
-    std::ofstream navFile ; //<! Output file stream for RINEX navigation data file
-    std::ofstream sbsFile ; //<! Output file stream for RINEX SBAS raw data file
-    std::ofstream navGalFile ; //<! Output file stream for RINEX Galileo navigation data file
-    std::ofstream navMixFile ; //<! Output file stream for RINEX Mixed navigation data file
+    std::fstream obsFile ; //<! Output file stream for RINEX observation file
+    std::fstream navFile ; //<! Output file stream for RINEX navigation data file
+    std::fstream sbsFile ; //<! Output file stream for RINEX SBAS raw data file
+    std::fstream navGalFile ; //<! Output file stream for RINEX Galileo navigation data file
+    std::fstream navMixFile ; //<! Output file stream for RINEX Mixed navigation data file
 
     /*!
-     *  \brief Generates the GPS Navigation Data header
+     *  \brief Generates the GPS L1 C/A Navigation Data header
      */
-    void rinex_nav_header(std::ofstream& out, const Gps_Iono& iono, const Gps_Utc_Model& utc_model);
+    void rinex_nav_header(std::fstream & out, const Gps_Iono & iono, const Gps_Utc_Model & utc_model);
+
+    /*!
+     *  \brief Generates the GPS L2C(M) Navigation Data header
+     */
+    void rinex_nav_header(std::fstream & out, const Gps_CNAV_Iono & iono, const Gps_CNAV_Utc_Model & utc_model);
 
     /*!
      *  \brief Generates the Galileo Navigation Data header
      */
-    void rinex_nav_header(std::ofstream& out, const Galileo_Iono& iono, const Galileo_Utc_Model& utc_model, const Galileo_Almanac& galileo_almanac);
+    void rinex_nav_header(std::fstream & out, const Galileo_Iono & iono, const Galileo_Utc_Model & utc_model, const Galileo_Almanac & galileo_almanac);
 
     /*!
      *  \brief Generates the Mixed (GPS/Galileo) Navigation Data header
      */
-    void rinex_nav_header(std::ofstream& out, const Gps_Iono& gps_iono, const Gps_Utc_Model& gps_utc_model, const Galileo_Iono& galileo_iono, const Galileo_Utc_Model& galileo_utc_model, const Galileo_Almanac& galileo_almanac);
+    void rinex_nav_header(std::fstream & out, const Gps_Iono & gps_iono, const Gps_Utc_Model & gps_utc_model, const Galileo_Iono & galileo_iono, const Galileo_Utc_Model & galileo_utc_model, const Galileo_Almanac & galileo_almanac);
 
     /*!
      *  \brief Generates the GPS Observation data header
      */
-    void rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& eph, const double d_TOW_first_observation);
+    void rinex_obs_header(std::fstream & out, const Gps_Ephemeris & eph, const double d_TOW_first_observation);
 
     /*!
-     *  \brief Generates the Galileo Observation data header
+     *  \brief Generates the GPS L2 Observation data header
      */
-    void rinex_obs_header(std::ofstream& out, const Galileo_Ephemeris& eph, const double d_TOW_first_observation);
+    void rinex_obs_header(std::fstream & out, const Gps_CNAV_Ephemeris & eph, const double d_TOW_first_observation);
 
     /*!
-     *  \brief Generates the Mixed (GPS/Galileo) Observation data header
+     *  \brief Generates the dual frequency GPS L1 & L2 Observation data header
      */
-    void rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph, const double d_TOW_first_observation);
+    void rinex_obs_header(std::fstream & out, const Gps_Ephemeris & eph, const Gps_CNAV_Ephemeris & eph_cnav, const double d_TOW_first_observation);
+
+    /*!
+     *  \brief Generates the Galileo Observation data header. Example: bands("1B"), bands("1B 5X"), bands("5X"), ... Default: "1B".
+     */
+    void rinex_obs_header(std::fstream & out, const Galileo_Ephemeris & eph, const double d_TOW_first_observation, const std::string bands = "1B");
+
+    /*!
+     *  \brief Generates the Mixed (GPS/Galileo) Observation data header. Example: galileo_bands("1B"), galileo_bands("1B 5X"), galileo_bands("5X"), ... Default: "1B".
+     */
+    void rinex_obs_header(std::fstream & out, const Gps_Ephemeris & gps_eph, const Galileo_Ephemeris & galileo_eph, const double d_TOW_first_observation, const std::string galileo_bands = "1B");
 
     /*!
      *  \brief Generates the SBAS raw data header
      */
-    void rinex_sbs_header(std::ofstream& out);
+    void rinex_sbs_header(std::fstream & out);
 
     /*!
      *  \brief Computes the UTC time and returns a boost::posix_time::ptime object
      */
-    boost::posix_time::ptime compute_UTC_time(const Gps_Navigation_Message& nav_msg);
+    boost::posix_time::ptime compute_UTC_time(const Gps_Navigation_Message & nav_msg);
 
     /*!
      *  \brief Computes the GPS time and returns a boost::posix_time::ptime object
      */
-    boost::posix_time::ptime compute_GPS_time(const Gps_Ephemeris& eph, const double obs_time);
+    boost::posix_time::ptime compute_GPS_time(const Gps_Ephemeris & eph, const double obs_time);
+
+    /*!
+     *  \brief Computes the GPS time and returns a boost::posix_time::ptime object
+     */
+    boost::posix_time::ptime compute_GPS_time(const Gps_CNAV_Ephemeris & eph, const double obs_time);
 
     /*!
      *  \brief Computes the Galileo time and returns a boost::posix_time::ptime object
      */
-    boost::posix_time::ptime compute_Galileo_time(const Galileo_Ephemeris& eph, const double obs_time);
+    boost::posix_time::ptime compute_Galileo_time(const Galileo_Ephemeris & eph, const double obs_time);
 
     /*!
-     *  \brief Writes data from the GPS navigation message into the RINEX file
+     *  \brief Writes data from the GPS L1 C/A navigation message into the RINEX file
      */
-    void log_rinex_nav(std::ofstream& out, const std::map<int, Gps_Ephemeris>& eph_map);
+    void log_rinex_nav(std::fstream & out, const std::map<int, Gps_Ephemeris> & eph_map);
+
+    /*!
+     *  \brief Writes data from the GPS L2 navigation message into the RINEX file
+     */
+    void log_rinex_nav(std::fstream & out, const std::map<int, Gps_CNAV_Ephemeris> & eph_map);
 
     /*!
      *  \brief Writes data from the Galileo navigation message into the RINEX file
      */
-    void log_rinex_nav(std::ofstream& out, const std::map<int, Galileo_Ephemeris>& eph_map);
+    void log_rinex_nav(std::fstream & out, const std::map<int, Galileo_Ephemeris> & eph_map);
 
     /*!
      *  \brief Writes data from the Mixed (GPS/Galileo) navigation message into the RINEX file
      */
-    void log_rinex_nav(std::ofstream& out, const std::map<int, Gps_Ephemeris>& gps_eph_map, const std::map<int, Galileo_Ephemeris>& galileo_eph_map);
+    void log_rinex_nav(std::fstream & out, const std::map<int, Gps_Ephemeris> & gps_eph_map, const std::map<int, Galileo_Ephemeris> & galileo_eph_map);
 
     /*!
-     *  \brief Writes GPS observables into the RINEX file
+     *  \brief Writes GPS L1 observables into the RINEX file
      */
-    void log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, double obs_time, const std::map<int, Gnss_Synchro>& pseudoranges);
+    void log_rinex_obs(std::fstream & out, const Gps_Ephemeris & eph, double obs_time, const std::map<int, Gnss_Synchro> & observables);
 
     /*!
-     *  \brief Writes Galileo observables into the RINEX file
+     *  \brief Writes GPS L2 observables into the RINEX file
      */
-    void log_rinex_obs(std::ofstream& out, const Galileo_Ephemeris& eph, double obs_time, const std::map<int, Gnss_Synchro>& pseudoranges);
+    void log_rinex_obs(std::fstream & out, const Gps_CNAV_Ephemeris & eph, double obs_time, const std::map<int, Gnss_Synchro> & observables);
 
     /*!
-     *  \brief Writes Galileo observables into the RINEX file
+     *  \brief Writes dual frequency GPS L1 and L2 observables into the RINEX file
      */
-    void log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph, const double gps_obs_time, const std::map<int, Gnss_Synchro>& pseudoranges);
+    void log_rinex_obs(std::fstream & out, const Gps_Ephemeris & eph, const Gps_CNAV_Ephemeris & eph_cnav, double obs_time, const std::map<int, Gnss_Synchro> & observables);
+
+    /*!
+     *  \brief Writes Galileo observables into the RINEX file. Example: galileo_bands("1B"), galileo_bands("1B 5X"), galileo_bands("5X"), ... Default: "1B".
+     */
+    void log_rinex_obs(std::fstream & out, const Galileo_Ephemeris & eph, double obs_time, const std::map<int, Gnss_Synchro> & observables, const std::string galileo_bands = "1B");
+
+    /*!
+     *  \brief Writes Mixed GPS / Galileo observables into the RINEX file
+     */
+    void log_rinex_obs(std::fstream & out, const Gps_Ephemeris & gps_eph, const Galileo_Ephemeris & galileo_eph, const double gps_obs_time, const std::map<int, Gnss_Synchro> & observables);
 
     /*!
      * \brief Represents GPS time in the date time format. Leap years are considered, but leap seconds are not.
      */
-    void to_date_time(int gps_week, int gps_tow, int &year, int &month, int &day, int &hour, int &minute, int &second);
+    void to_date_time(int gps_week, int gps_tow, int & year, int & month, int & day, int & hour, int & minute, int & second);
 
     /*!
      *  \brief Writes raw SBAS messages into the RINEX file
      */
-    void log_rinex_sbs(std::ofstream& out, const Sbas_Raw_Msg& sbs_message);
+    void log_rinex_sbs(std::fstream & out, const Sbas_Raw_Msg & sbs_message);
+
+    void update_nav_header(std::fstream & out, const Gps_Utc_Model & gps_utc, const Gps_Iono & gps_iono);
+
+    void update_nav_header(std::fstream & out, const Gps_CNAV_Utc_Model & utc_model, const Gps_CNAV_Iono & iono);
+
+    void update_nav_header(std::fstream & out, const Gps_Iono & gps_iono, const Gps_Utc_Model & gps_utc_model, const Galileo_Iono & galileo_iono, const Galileo_Utc_Model & galileo_utc_model, const Galileo_Almanac& galileo_almanac);
+
+    void update_nav_header(std::fstream & out, const Galileo_Iono & galileo_iono, const Galileo_Utc_Model & utc_model, const Galileo_Almanac & galileo_almanac);
+
+    void update_obs_header(std::fstream & out, const Gps_Utc_Model & utc_model);
+
+    void update_obs_header(std::fstream & out, const Gps_CNAV_Utc_Model & utc_model);
+
+    void update_obs_header(std::fstream & out, const Galileo_Utc_Model & galileo_utc_model);
 
     std::map<std::string,std::string> satelliteSystem; //<! GPS, GLONASS, SBAS payload, Galileo or Compass
     std::map<std::string,std::string> observationType; //<! PSEUDORANGE, CARRIER_PHASE, DOPPLER, SIGNAL_STRENGTH
     std::map<std::string,std::string> observationCode; //<! GNSS observation descriptors
     std::string stringVersion; //<! RINEX version (2.10/2.11 or 3.01/3.02)
+
+    std::string navfilename;
+    std::string obsfilename;
+    std::string sbsfilename;
+    std::string navGalfilename;
+    std::string navMixfilename;
 
 private:
     int version ;  // RINEX version (2 for 2.10/2.11 and 3 for 3.01)
@@ -211,12 +267,6 @@ private:
      */
     std::string createFilename(std::string type);
 
-    std::string navfilename;
-    std::string obsfilename;
-    std::string sbsfilename;
-    std::string navGalfilename;
-    std::string navMixfilename;
-
     /*
      * Generates the data for the PGM / RUN BY / DATE line
      */
@@ -225,7 +275,7 @@ private:
     /*
      *  Checks that the line is 80 characters length
      */
-    void lengthCheck(const std::string& line);
+    void lengthCheck(const std::string & line);
 
     /*
      * If the string is bigger than length, truncate it from the right.
@@ -240,7 +290,7 @@ private:
      * \param[in] length new desired length of string.
      * \param[in] pad character to pad string with (blank by default).
      * \return a reference to \a s.  */
-    inline std::string& leftJustify(std::string& s,
+    inline std::string & leftJustify(std::string & s,
             const std::string::size_type length,
             const char pad = ' ');
 
@@ -257,10 +307,12 @@ private:
      * \param[in] length new desired length of string.
      * \param[in] pad character to pad string with (blank by default).
      * \return a reference to \a s.  */
-    inline std::string leftJustify(const std::string& s,
+    inline std::string leftJustify(const std::string & s,
             const std::string::size_type length,
             const char pad = ' ')
-    { std::string t(s); return leftJustify(t, length, pad); }
+    {
+        std::string t(s); return leftJustify(t, length, pad);
+    }
 
 
     /*
@@ -269,7 +321,7 @@ private:
      * requested length (\a length), it is padded on the left with
      * the pad character (\a pad). The default pad
      * character is a blank. */
-    inline std::string& rightJustify(std::string& s,
+    inline std::string & rightJustify(std::string & s,
             const std::string::size_type length,
             const char pad = ' ');
 
@@ -279,11 +331,12 @@ private:
      * requested length (\a length), it is padded on the left with
      * the pad character (\a pad). The default pad
      * character is a blank.*/
-    inline std::string rightJustify(const std::string& s,
+    inline std::string rightJustify(const std::string & s,
             const std::string::size_type length,
             const char pad = ' ')
-    { std::string t(s); return rightJustify(t, length, pad); }
-
+    {
+        std::string t(s); return rightJustify(t, length, pad);
+    }
 
 
     /*
@@ -296,13 +349,11 @@ private:
      * exponentials above three characters in length.  If false, it removes
      * that check.
      */
-    inline std::string doub2sci(const double& d,
+    inline std::string doub2sci(const double & d,
             const std::string::size_type length,
             const std::string::size_type expLen,
             const bool showSign = true,
             const bool checkSwitch = true);
-
-
 
 
     /*
@@ -319,14 +370,11 @@ private:
      * produce an exponential with an E instead of a D, and always have a leading
      * zero.  For example -> 0.87654E-0004 or -0.1234E00005.
      */
-    inline std::string& sci2for(std::string& aStr,
+    inline std::string & sci2for(std::string & aStr,
             const std::string::size_type startPos = 0,
             const std::string::size_type length = std::string::npos,
             const std::string::size_type expLen = 3,
             const bool checkSwitch = true);
-
-
-
 
 
     /*
@@ -341,7 +389,7 @@ private:
      * that check.
      * @return a string containing \a d in FORTRAN notation.
      */
-    inline std::string doub2for(const double& d,
+    inline std::string doub2for(const double & d,
             const std::string::size_type length,
             const std::string::size_type expLen,
             const bool checkSwitch = true);
@@ -352,8 +400,10 @@ private:
      * @param s string containing a number.
      * @return double representation of string.
      */
-    inline double asDouble(const std::string& s)
-    { return strtod(s.c_str(), 0); }
+    inline double asDouble(const std::string & s)
+    {
+        return strtod(s.c_str(), 0);
+    }
 
 
     inline int toInt(std::string bitString, int sLength);
@@ -363,8 +413,10 @@ private:
      * @param s string containing a number.
      * @return long integer representation of string.
      */
-    inline long asInt(const std::string& s)
-    { return strtol(s.c_str(), 0, 10); }
+    inline long asInt(const std::string & s)
+    {
+        return strtol(s.c_str(), 0, 10);
+    }
 
 
     /*
@@ -386,14 +438,15 @@ private:
     inline std::string asString(const long double x,
             const std::string::size_type precision = 21);
 
+
     /*
      * Convert any old object to a string.
      * The class must have stream operators defined.
      * @param x object to turn into a string.
      * @return string representation of \a x.
      */
-    template <class X>
-    inline std::string asString(const X x);
+    template <class X> inline std::string asString(const X x);
+
     inline std::string asFixWidthString(const int x, const int width, char fill_digit);
 };
 
@@ -401,11 +454,10 @@ private:
 
 // Implementation of inline functions (modified versions from GPSTk http://www.gpstk.org)
 
-inline std::string& Rinex_Printer::leftJustify(std::string& s,
+inline std::string & Rinex_Printer::leftJustify(std::string & s,
         const std::string::size_type length,
         const char pad)
 {
-
     if(length < s.length())
         {
             s = s.substr(0, length);
@@ -420,7 +472,7 @@ inline std::string& Rinex_Printer::leftJustify(std::string& s,
 
 // if the string is bigger than length, truncate it from the left.
 // otherwise, add pad characters to its left.
-inline std::string& Rinex_Printer::rightJustify(std::string& s,
+inline std::string & Rinex_Printer::rightJustify(std::string & s,
         const std::string::size_type length,
         const char pad)
 {
@@ -437,14 +489,11 @@ inline std::string& Rinex_Printer::rightJustify(std::string& s,
 
 
 
-
-
-inline std::string Rinex_Printer::doub2for(const double& d,
+inline std::string Rinex_Printer::doub2for(const double & d,
         const std::string::size_type length,
         const std::string::size_type expLen,
         const bool checkSwitch)
 {
-
     short exponentLength = expLen;
 
     /* Validate the assumptions regarding the input arguments */
@@ -455,11 +504,10 @@ inline std::string Rinex_Printer::doub2for(const double& d,
     sci2for(toReturn, 0, length, exponentLength, checkSwitch);
 
     return toReturn;
-
 }
 
 
-inline std::string Rinex_Printer::doub2sci(const double& d,
+inline std::string Rinex_Printer::doub2sci(const double & d,
         const std::string::size_type length,
         const std::string::size_type expLen,
         const bool showSign,
@@ -489,7 +537,8 @@ inline std::string Rinex_Printer::doub2sci(const double& d,
     return toReturn;
 }
 
-inline std::string& Rinex_Printer::sci2for(std::string& aStr,
+
+inline std::string & Rinex_Printer::sci2for(std::string & aStr,
         const std::string::size_type startPos,
         const std::string::size_type length,
         const std::string::size_type expLen,
@@ -501,12 +550,13 @@ inline std::string& Rinex_Printer::sci2for(std::string& aStr,
     long iexp;
     //If checkSwitch is false, always redo the exponential. Otherwise,
     //set it to false.
-    bool redoexp=!checkSwitch;
+    bool redoexp =! checkSwitch;
 
     // Check for decimal place within specified boundaries
-    if ((idx == 0) || (idx >= (startPos + length - expLen - 1)))
+    if ((idx <= 0) || (idx >= (startPos + length - expLen - 1)))
         {
-            //StringException e("sci2for: no decimal point in string");
+            // Error: no decimal point in string
+            return aStr;
         }
 
     // Here, account for the possibility that there are
@@ -518,8 +568,8 @@ inline std::string& Rinex_Printer::sci2for(std::string& aStr,
         {
             redoexp = true;
             // Swap digit and decimal.
-            aStr[idx] = aStr[idx-1];
-            aStr[idx-1] = '.';
+            aStr[idx] = aStr[idx - 1];
+            aStr[idx - 1] = '.';
             // Only add one to the exponent if the number is non-zero
             if (asDouble(aStr.substr(startPos, length)) != 0.0)
                 expAdd = 1;
@@ -531,8 +581,7 @@ inline std::string& Rinex_Printer::sci2for(std::string& aStr,
             idx = aStr.find('E', startPos);
             if (idx == std::string::npos)
                 {
-                    //StringException e("sci2for:no 'e' or 'E' in string");
-                    //GPSTK_THROW(e);
+                    // Error: no 'e' or 'E' in string";
                 }
         }
 
@@ -586,8 +635,6 @@ inline std::string asString(const long double x, const std::string::size_type pr
 }
 
 
-
-
 inline std::string Rinex_Printer::asString(const double x, const std::string::size_type precision)
 {
     std::ostringstream ss;
@@ -600,29 +647,30 @@ inline std::string Rinex_Printer::asFixWidthString(const int x, const int width,
 {
     std::ostringstream ss;
     ss << std::setfill(fill_digit) << std::setw(width) << x;
-    //std::cout << "asFixWidthString(): x=" << x << " width=" << width << " fill_digit=" << fill_digit << " ss=" << ss.str() << std::endl;
     return ss.str().substr(ss.str().size() - width);
 }
 
-inline long asInt(const std::string& s)
-    { return strtol(s.c_str(), 0, 10); }
+
+inline long asInt(const std::string & s)
+{
+    return strtol(s.c_str(), 0, 10);
+}
 
 
 inline int Rinex_Printer::toInt(std::string bitString, int sLength)
 {
     int tempInt;
     int num = 0;
-    for(int i=0; i < sLength; i++)
+    for(int i = 0; i < sLength; i++)
     {
         tempInt = bitString[i]-'0';
-        num |= (1 << (sLength-1-i)) * tempInt;
+        num |= (1 << (sLength - 1 - i)) * tempInt;
     }
     return num;
 }
 
 
-template<class X>
-inline std::string Rinex_Printer::asString(const X x)
+template<class X> inline std::string Rinex_Printer::asString(const X x)
 {
     std::ostringstream ss;
     ss << x;

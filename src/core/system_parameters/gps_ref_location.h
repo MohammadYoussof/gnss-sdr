@@ -32,7 +32,6 @@
 #ifndef GNSS_SDR_GPS_REF_LOCATION_H_
 #define GNSS_SDR_GPS_REF_LOCATION_H_
 
-#include "GPS_L1_CA.h"
 #include "boost/assign.hpp"
 #include <boost/serialization/nvp.hpp>
 
@@ -61,7 +60,7 @@ public:
     void serialize(Archive& archive, const unsigned int version)
         {
             using boost::serialization::make_nvp;
-
+            if(version){};
             archive & make_nvp("valid", valid);
             archive & make_nvp("lat", lat);
             archive & make_nvp("lon", lon);

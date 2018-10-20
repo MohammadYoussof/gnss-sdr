@@ -16,18 +16,22 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
+if(ENABLE_CUDA)
+     set(OPT_TRACKING_ADAPTERS ${OPT_TRACKING_ADAPTERS} gps_l1_ca_dll_pll_tracking_gpu.cc)
+     set(OPT_TRACKING_INCLUDE_DIRS ${OPT_TRACKING_INCLUDE_DIRS} ${CUDA_INCLUDE_DIRS})
+endif(ENABLE_CUDA)
 
 set(TRACKING_ADAPTER_SOURCES 
      galileo_e1_dll_pll_veml_tracking.cc
-     galileo_volk_e1_dll_pll_veml_tracking.cc
      galileo_e1_tcp_connector_tracking.cc
-     gps_l1_ca_dll_fll_pll_tracking.cc
-     gps_l1_ca_dll_pll_optim_tracking.cc
      gps_l1_ca_dll_pll_tracking.cc
+     gps_l1_ca_dll_pll_c_aid_tracking.cc
      gps_l1_ca_tcp_connector_tracking.cc
      galileo_e5a_dll_pll_tracking.cc
+     gps_l2_m_dll_pll_tracking.cc
+     ${OPT_TRACKING_ADAPTERS}
 )
-
+ 
 include_directories(
      $(CMAKE_CURRENT_SOURCE_DIR)
      ${CMAKE_SOURCE_DIR}/src/core/system_parameters
@@ -39,9 +43,12 @@ include_directories(
      ${GLOG_INCLUDE_DIRS}
      ${GFlags_INCLUDE_DIRS}
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
+     ${VOLK_GNSSSDR_INCLUDE_DIRS}
+     ${OPT_TRACKING_INCLUDE_DIRS}
 )
 
 file(GLOB TRACKING_ADAPTER_HEADERS "*.h")
+list(SORT TRACKING_ADAPTER_HEADERS)
 add_library(tracking_adapters ${TRACKING_ADAPTER_SOURCES} ${TRACKING_ADAPTER_HEADERS})
 source_group(Headers FILES ${TRACKING_ADAPTER_HEADERS})
 target_link_libraries(tracking_adapters tracking_gr_blocks gnss_sp_libs)

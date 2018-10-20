@@ -35,7 +35,7 @@
 /*!
  * \brief This class is a storage for the GALILEO ALMANAC data as described in GALILEO ICD
  *
- * See http://ec.europa.eu/enterprise/policies/satnav/galileo/files/galileo-os-sis-icd-issue1-revision1_en.pdf paragraph 5.1.10
+ * See https://www.gsc-europa.eu/system/files/galileo_documents/Galileo_OS_SIS_ICD.pdf paragraph 5.1.10
  */
 class Galileo_Almanac
 {
@@ -96,10 +96,10 @@ public:
     double E5a_HS_10;
 
     /*GPS to Galileo GST conversion parameters*/
-    double A_0G_10 = 0;
-    double A_1G_10 = 0;
-    double t_0G_10 = 0;
-    double WN_0G_10 = 0;
+    double A_0G_10;
+    double A_1G_10;
+    double t_0G_10;
+    double WN_0G_10;
 
     Galileo_Almanac();  //!< Default constructor
 };

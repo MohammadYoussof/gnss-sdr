@@ -35,8 +35,6 @@
 #define GNSS_SDR_GPS_L1_CA_PCPS_ACQUISITION_FINE_DOPPLER_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
-#include <gnuradio/blocks/stream_to_vector.h>
 #include "gnss_synchro.h"
 #include "acquisition_interface.h"
 #include "pcps_acquisition_fine_doppler_cc.h"
@@ -52,9 +50,9 @@ class ConfigurationInterface;
 class GpsL1CaPcpsAcquisitionFineDoppler: public AcquisitionInterface
 {
 public:
-	GpsL1CaPcpsAcquisitionFineDoppler(ConfigurationInterface* configuration,
+    GpsL1CaPcpsAcquisitionFineDoppler(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GpsL1CaPcpsAcquisitionFineDoppler();
 
@@ -108,11 +106,6 @@ public:
     void set_doppler_step(unsigned int doppler_step);
 
     /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
-
-    /*!
      * \brief Initializes acquisition algorithm.
      */
     void init();
@@ -150,8 +143,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 };
 
 #endif /* GNSS_SDR_GPS_L1_CA_PCPS_ACQUISITION_FINE_DOPPLER_H_ */

@@ -33,53 +33,36 @@
 #include "gps_l1_ca_telemetry_decoder.h"
 #include <gnuradio/io_signature.h>
 #include <glog/logging.h>
+#include "concurrent_queue.h"
 #include "gps_ephemeris.h"
 #include "gps_almanac.h"
 #include "gps_iono.h"
 #include "gps_utc_model.h"
 #include "configuration_interface.h"
-#include "gps_l1_ca_telemetry_decoder_cc.h"
-
-extern concurrent_queue<Gps_Ephemeris> global_gps_ephemeris_queue;
-extern concurrent_queue<Gps_Iono> global_gps_iono_queue;
-extern concurrent_queue<Gps_Utc_Model> global_gps_utc_model_queue;
-extern concurrent_queue<Gps_Almanac> global_gps_almanac_queue;
-
 
 using google::LogMessage;
 
 GpsL1CaTelemetryDecoder::GpsL1CaTelemetryDecoder(ConfigurationInterface* configuration,
         std::string role,
         unsigned int in_streams,
-        unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
+        unsigned int out_streams) :
         role_(role),
         in_streams_(in_streams),
-        out_streams_(out_streams),
-        queue_(queue)
+        out_streams_(out_streams)
 {
-    std::string default_item_type = "gr_complex";
     std::string default_dump_filename = "./navigation.dat";
     DLOG(INFO) << "role " << role;
-    DLOG(INFO) << "vector length " << vector_length_;
-    vector_length_ = configuration->property(role + ".vector_length", 2048);
     dump_ = configuration->property(role + ".dump", false);
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_filename);
-    int fs_in;
-    fs_in = configuration->property("GNSS-SDR.internal_fs_hz", 2048000);
     // make telemetry decoder object
-    telemetry_decoder_ = gps_l1_ca_make_telemetry_decoder_cc(satellite_, 0, (long)fs_in, vector_length_, queue_, dump_); // TODO fix me
+    telemetry_decoder_ = gps_l1_ca_make_telemetry_decoder_cc(satellite_, dump_); // TODO fix me
     DLOG(INFO) << "telemetry_decoder(" << telemetry_decoder_->unique_id() << ")";
-    // set the navigation msg queue;
-    telemetry_decoder_->set_ephemeris_queue(&global_gps_ephemeris_queue);
-    telemetry_decoder_->set_iono_queue(&global_gps_iono_queue);
-    telemetry_decoder_->set_almanac_queue(&global_gps_almanac_queue);
-    telemetry_decoder_->set_utc_model_queue(&global_gps_utc_model_queue);
 
     //decimation factor
-    int decimation_factor=configuration->property(role + ".decimation_factor", 1);
+    int decimation_factor = configuration->property(role + ".decimation_factor", 1);
     telemetry_decoder_->set_decimation(decimation_factor);
     DLOG(INFO) << "global navigation message queue assigned to telemetry_decoder ("<< telemetry_decoder_->unique_id() << ")";
+    channel_ = 0;
 }
 
 
@@ -97,6 +80,7 @@ void GpsL1CaTelemetryDecoder::set_satellite(Gnss_Satellite satellite)
 
 void GpsL1CaTelemetryDecoder::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to connect internally
     DLOG(INFO) << "nothing to connect internally";
 }
@@ -104,6 +88,7 @@ void GpsL1CaTelemetryDecoder::connect(gr::top_block_sptr top_block)
 
 void GpsL1CaTelemetryDecoder::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to disconnect
 }
 

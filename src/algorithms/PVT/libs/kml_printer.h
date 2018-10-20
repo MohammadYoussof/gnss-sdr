@@ -37,9 +37,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
-#include "gps_l1_ca_ls_pvt.h"
-#include "galileo_e1_ls_pvt.h"
-#include "hybrid_ls_pvt.h"
+#include "pvt_solution.h"
 
 /*!
  * \brief Prints PVT information to OGC KML format file (can be viewed with Google Earth)
@@ -50,14 +48,14 @@ class Kml_Printer
 {
 private:
     std::ofstream kml_file;
+    bool positions_printed;
+    std::string kml_filename;
 public:
-    bool set_headers(std::string filename);
-    bool print_position(const std::shared_ptr<gps_l1_ca_ls_pvt>& position, bool print_average_values);
-    bool print_position_galileo(const std::shared_ptr<galileo_e1_ls_pvt>& position, bool print_average_values);
-    bool print_position_hybrid(const std::shared_ptr<hybrid_ls_pvt>& position, bool print_average_values);
-    bool close_file();
     Kml_Printer();
     ~Kml_Printer();
+    bool set_headers(std::string filename, bool time_tag_name = true);
+    bool print_position(const std::shared_ptr<Pvt_Solution>& position, bool print_average_values);
+    bool close_file();
 };
 
 #endif

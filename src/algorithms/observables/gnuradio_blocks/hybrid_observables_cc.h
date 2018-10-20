@@ -30,29 +30,20 @@
  */
 
 
-#ifndef GNSS_SDR_hybrid_observables_CC_H
-#define	GNSS_SDR_hybrid_observables_CC_H
+#ifndef GNSS_SDR_HYBRID_OBSERVABLES_CC_H
+#define GNSS_SDR_HYBRID_OBSERVABLES_CC_H
 
 #include <fstream>
-#include <queue>
 #include <string>
-#include <utility>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
-#include "concurrent_queue.h"
-#include "galileo_navigation_message.h"
-#include "rinex_printer.h"
-#include "Galileo_E1.h"
-#include "gnss_synchro.h"
+
 
 class hybrid_observables_cc;
 
 typedef boost::shared_ptr<hybrid_observables_cc> hybrid_observables_cc_sptr;
 
 hybrid_observables_cc_sptr
-hybrid_make_observables_cc(unsigned int n_channels, boost::shared_ptr<gr::msg_queue> queue, bool dump, std::string dump_filename, int output_rate_ms, bool flag_averaging);
+hybrid_make_observables_cc(unsigned int n_channels, bool dump, std::string dump_filename, unsigned int deep_history);
 
 /*!
  * \brief This class implements a block that computes Galileo observables
@@ -61,23 +52,23 @@ class hybrid_observables_cc : public gr::block
 {
 public:
     ~hybrid_observables_cc ();
-    void set_fs_in(unsigned long int fs_in) {d_fs_in = fs_in;};
     int general_work (int noutput_items, gr_vector_int &ninput_items,
             gr_vector_const_void_star &input_items, gr_vector_void_star &output_items);
 
 private:
     friend hybrid_observables_cc_sptr
-    hybrid_make_observables_cc(unsigned int nchannels, boost::shared_ptr<gr::msg_queue> queue, bool dump, std::string dump_filename, int output_rate_ms, bool flag_averaging);
-    hybrid_observables_cc(unsigned int nchannels, boost::shared_ptr<gr::msg_queue> queue, bool dump, std::string dump_filename, int output_rate_ms, bool flag_averaging);
+    hybrid_make_observables_cc(unsigned int nchannels, bool dump, std::string dump_filename, unsigned int deep_history);
+    hybrid_observables_cc(unsigned int nchannels, bool dump, std::string dump_filename, unsigned int deep_history);
+
+    //Tracking observable history
+    std::vector<std::deque<double>> d_acc_carrier_phase_queue_rads;
+    std::vector<std::deque<double>> d_carrier_doppler_queue_hz;
+    std::vector<std::deque<double>> d_symbol_TOW_queue_s;
 
     // class private vars
-    boost::shared_ptr<gr::msg_queue> d_queue;
     bool d_dump;
-    bool d_flag_averaging;
-    long int d_sample_counter;
     unsigned int d_nchannels;
-    unsigned long int d_fs_in;
-    int d_output_rate_ms;
+    unsigned int history_deep;
     std::string d_dump_filename;
     std::ofstream d_dump_file;
 };

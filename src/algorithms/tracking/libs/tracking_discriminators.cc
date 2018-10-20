@@ -39,16 +39,16 @@
 /*
  * FLL four quadrant arctan discriminator:
  * \f{equation}
- * 	\frac{\phi_2-\phi_1}{t_2-t1}=\frac{ATAN2(cross,dot)}{t_1-t_2},
+ *     \frac{\phi_2-\phi_1}{t_2-t1}=\frac{ATAN2(cross,dot)}{t_1-t_2},
  * \f}
  * where \f$cross=I_{PS1}Q_{PS2}-I_{PS2}Q_{PS1}\f$ and \f$dot=I_{PS1}I_{PS2}+Q_{PS1}Q_{PS2}\f$,
  * \f$I_{PS1},Q_{PS1}\f$ are the inphase and quadrature prompt correlator outputs respectively at sample time \f$t_1\f$, and
  * \f$I_{PS2},Q_{PS2}\f$ are the inphase and quadrature prompt correlator outputs respectively at sample time \f$t_2\f$. The output is in [radians/second].
  */
 
-float fll_four_quadrant_atan(gr_complex prompt_s1, gr_complex prompt_s2, float t1, float t2)
+double fll_four_quadrant_atan(gr_complex prompt_s1, gr_complex prompt_s2, double t1, double t2)
 {
-    float cross, dot;
+    double cross, dot;
     dot   = prompt_s1.real()*prompt_s2.real() + prompt_s1.imag()*prompt_s2.imag();
     cross = prompt_s1.real()*prompt_s2.imag() - prompt_s2.real()*prompt_s1.imag();
     return atan2(cross, dot) / (t2-t1);
@@ -58,11 +58,11 @@ float fll_four_quadrant_atan(gr_complex prompt_s1, gr_complex prompt_s2, float t
 /*
  * PLL four quadrant arctan discriminator:
  * \f{equation}
- * 	\phi=ATAN2(Q_{PS},I_{PS}),
+ *     \phi=ATAN2(Q_{PS},I_{PS}),
  * \f}
  * where \f$I_{PS1},Q_{PS1}\f$ are the inphase and quadrature prompt correlator outputs respectively. The output is in [radians].
  */
-float pll_four_quadrant_atan(gr_complex prompt_s1)
+double pll_four_quadrant_atan(gr_complex prompt_s1)
 {
     return atan2(prompt_s1.imag(), prompt_s1.real());
 }
@@ -71,11 +71,11 @@ float pll_four_quadrant_atan(gr_complex prompt_s1)
 /*
  * PLL Costas loop two quadrant arctan discriminator:
  * \f{equation}
- * 	\phi=ATAN\left(\frac{Q_{PS}}{I_{PS}}\right),
+ *     \phi=ATAN\left(\frac{Q_{PS}}{I_{PS}}\right),
  * \f}
  * where \f$I_{PS1},Q_{PS1}\f$ are the inphase and quadrature prompt correlator outputs respectively. The output is in [radians].
  */
-float pll_cloop_two_quadrant_atan(gr_complex prompt_s1)
+double pll_cloop_two_quadrant_atan(gr_complex prompt_s1)
 {
     if (prompt_s1.real() != 0.0)
         {
@@ -91,17 +91,24 @@ float pll_cloop_two_quadrant_atan(gr_complex prompt_s1)
 /*
  * DLL Noncoherent Early minus Late envelope normalized discriminator:
  * \f{equation}
- * 	error=\frac{E-L}{E+L},
+ *     error=\frac{1}{2}\frac{E-L}{E+L},
  * \f}
  * where \f$E=\sqrt{I_{ES}^2+Q_{ES}^2}\f$ is the Early correlator output absolute value and
  * \f$L=\sqrt{I_{LS}^2+Q_{LS}^2}\f$ is the Late correlator output absolute value. The output is in [chips].
  */
-float dll_nc_e_minus_l_normalized(gr_complex early_s1, gr_complex late_s1)
+double dll_nc_e_minus_l_normalized(gr_complex early_s1, gr_complex late_s1)
 {
-    float P_early, P_late;
+    double P_early, P_late;
     P_early = std::abs(early_s1);
     P_late  = std::abs(late_s1);
-    return (P_early - P_late) / ((P_early + P_late));
+    if( P_early + P_late == 0.0 )
+        {
+            return 0.0;
+        }
+    else
+        {
+            return 0.5 * (P_early - P_late) / ((P_early + P_late));
+        }
 }
 
 /*
@@ -113,10 +120,17 @@ float dll_nc_e_minus_l_normalized(gr_complex early_s1, gr_complex late_s1)
  * where \f$E=\sqrt{I_{VE}^2+Q_{VE}^2+I_{E}^2+Q_{E}^2}\f$ and
  * \f$L=\sqrt{I_{VL}^2+Q_{VL}^2+I_{L}^2+Q_{L}^2}\f$ . The output is in [chips].
  */
-float dll_nc_vemlp_normalized(gr_complex very_early_s1, gr_complex early_s1, gr_complex late_s1, gr_complex very_late_s1)
+double dll_nc_vemlp_normalized(gr_complex very_early_s1, gr_complex early_s1, gr_complex late_s1, gr_complex very_late_s1)
 {
-    float P_early, P_late;
+    double P_early, P_late;
     P_early = std::sqrt(std::norm(very_early_s1) + std::norm(early_s1));
     P_late  = std::sqrt(std::norm(very_late_s1) + std::norm(late_s1));
-    return (P_early - P_late) / ((P_early + P_late));
+    if( P_early + P_late == 0.0 )
+        {
+            return 0.0;
+        }
+    else
+        {
+            return (P_early - P_late) / ((P_early + P_late));
+        }
 }

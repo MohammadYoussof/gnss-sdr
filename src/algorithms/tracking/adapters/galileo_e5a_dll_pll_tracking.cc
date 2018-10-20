@@ -1,12 +1,12 @@
 /*!
- * \file galileo_e5a_dll_fll_pll_tracking.cc
+ * \file galileo_e5a_dll_pll_tracking.cc
  * \brief Adapts a code DLL + carrier PLL
  *  tracking block to a TrackingInterface for Galileo E5a signals
  * \brief Adapts a PCPS acquisition block to an AcquisitionInterface for
  *  Galileo E5a data and pilot Signals
  * \author Marc Sales, 2014. marcsales92(at)gmail.com
  * \based on work from:
- * 		<ul>
+ *          <ul>
  *          <li> Javier Arribas, 2011. jarribas(at)cttc.es
  *          <li> Luis Esteve, 2012. luis(at)epsilon-formacion.com
  *          </ul>
@@ -46,10 +46,8 @@ using google::LogMessage;
 
 GalileoE5aDllPllTracking::GalileoE5aDllPllTracking(
         ConfigurationInterface* configuration, std::string role,
-        unsigned int in_streams, unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
-                role_(role), in_streams_(in_streams), out_streams_(out_streams),
-                queue_(queue)
+        unsigned int in_streams, unsigned int out_streams) :
+                role_(role), in_streams_(in_streams), out_streams_(out_streams)
 {
     DLOG(INFO) << "role " << role;
     //################# CONFIGURATION PARAMETERS ########################
@@ -91,7 +89,6 @@ GalileoE5aDllPllTracking::GalileoE5aDllPllTracking(
                     f_if,
                     fs_in,
                     vector_length,
-                    queue_,
                     dump,
                     dump_filename,
                     pll_bw_hz,
@@ -103,8 +100,10 @@ GalileoE5aDllPllTracking::GalileoE5aDllPllTracking(
         }
     else
         {
+            item_size_ = sizeof(gr_complex);
             LOG(WARNING) << item_type << " unknown tracking item type.";
         }
+    channel_ = 0;
     DLOG(INFO) << "tracking(" << tracking_->unique_id() << ")";
 }
 
@@ -127,15 +126,6 @@ void GalileoE5aDllPllTracking::set_channel(unsigned int channel)
     tracking_->set_channel(channel);
 }
 
-/*
- * Set tracking channel internal queue
- */
-void GalileoE5aDllPllTracking::set_channel_queue(
-        concurrent_queue<int> *channel_internal_queue)
-{
-    channel_internal_queue_ = channel_internal_queue;
-    tracking_->set_channel_queue(channel_internal_queue_);
-}
 
 void GalileoE5aDllPllTracking::set_gnss_synchro(Gnss_Synchro* p_gnss_synchro)
 {
@@ -144,11 +134,13 @@ void GalileoE5aDllPllTracking::set_gnss_synchro(Gnss_Synchro* p_gnss_synchro)
 
 void GalileoE5aDllPllTracking::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     //nothing to connect, now the tracking uses gr_sync_decimator
 }
 
 void GalileoE5aDllPllTracking::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     //nothing to disconnect, now the tracking uses gr_sync_decimator
 }
 

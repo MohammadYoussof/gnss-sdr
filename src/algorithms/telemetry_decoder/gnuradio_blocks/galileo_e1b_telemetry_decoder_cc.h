@@ -35,10 +35,6 @@
 #include <fstream>
 #include <string>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
-#include <gnuradio/trellis/interleaver.h>
-#include <gnuradio/trellis/permutation.h>
-#include <gnuradio/fec/viterbi.h>
 #include "Galileo_E1.h"
 #include "concurrent_queue.h"
 #include "gnss_satellite.h"
@@ -54,8 +50,7 @@ class galileo_e1b_telemetry_decoder_cc;
 
 typedef boost::shared_ptr<galileo_e1b_telemetry_decoder_cc> galileo_e1b_telemetry_decoder_cc_sptr;
 
-galileo_e1b_telemetry_decoder_cc_sptr galileo_e1b_make_telemetry_decoder_cc(Gnss_Satellite satellite, long if_freq, long fs_in, unsigned
-    int vector_length, boost::shared_ptr<gr::msg_queue> queue, bool dump);
+galileo_e1b_telemetry_decoder_cc_sptr galileo_e1b_make_telemetry_decoder_cc(Gnss_Satellite satellite, bool dump);
 
 /*!
  * \brief This class implements a block that decodes the INAV data defined in Galileo ICD
@@ -68,10 +63,11 @@ public:
     void set_satellite(Gnss_Satellite satellite);  //!< Set satellite PRN
     void set_channel(int channel);                 //!< Set receiver's channel
     int flag_even_word_arrived;
-    void set_ephemeris_queue(concurrent_queue<Galileo_Ephemeris> *ephemeris_queue); //!< Set the satellite data queue
-    void set_iono_queue(concurrent_queue<Galileo_Iono> *iono_queue);                //!< Set the iono data queue
-    void set_almanac_queue(concurrent_queue<Galileo_Almanac> *almanac_queue);       //!< Set the almanac data queue
-    void set_utc_model_queue(concurrent_queue<Galileo_Utc_Model> *utc_model_queue); //!< Set the UTC model queue
+    /*!
+     * \brief Set decimation factor to average the GPS synchronization estimation output from the tracking module.
+     */
+    void set_decimation(int decimation);
+
     /*!
      * \brief This is where all signal processing takes place
      */
@@ -86,10 +82,8 @@ public:
 
 private:
     friend galileo_e1b_telemetry_decoder_cc_sptr
-    galileo_e1b_make_telemetry_decoder_cc(Gnss_Satellite satellite, long if_freq, long fs_in,unsigned
-            int vector_length, boost::shared_ptr<gr::msg_queue> queue, bool dump);
-    galileo_e1b_telemetry_decoder_cc(Gnss_Satellite satellite, long if_freq, long fs_in, unsigned
-            int vector_length, boost::shared_ptr<gr::msg_queue> queue, bool dump);
+    galileo_e1b_make_telemetry_decoder_cc(Gnss_Satellite satellite, bool dump);
+    galileo_e1b_telemetry_decoder_cc(Gnss_Satellite satellite, bool dump);
 
     void viterbi_decoder(double *page_part_symbols, int *page_part_bits);
 
@@ -99,7 +93,7 @@ private:
 
     unsigned short int d_preambles_bits[GALILEO_INAV_PREAMBLE_LENGTH_BITS];
 
-    signed int *d_preambles_symbols;
+    int *d_preambles_symbols;
     unsigned int d_samples_per_symbol;
     int d_symbols_per_preamble;
 
@@ -112,25 +106,16 @@ private:
     bool d_flag_preamble;
     int d_CRC_error_counter;
 
-    long d_fs_in;
-
     // navigation message vars
     Galileo_Navigation_Message d_nav;
 
-    // Galileo ephemeris queue
-    concurrent_queue<Galileo_Ephemeris> *d_ephemeris_queue;
-    // ionospheric parameters queue
-    concurrent_queue<Galileo_Iono> *d_iono_queue;
-    // UTC model parameters queue
-    concurrent_queue<Galileo_Utc_Model> *d_utc_model_queue;
-    // Almanac queue
-    concurrent_queue<Galileo_Almanac> *d_almanac_queue;
-
-    boost::shared_ptr<gr::msg_queue> d_queue;
-    unsigned int d_vector_length;
     bool d_dump;
     Gnss_Satellite d_satellite;
     int d_channel;
+
+    // output averaging and decimation
+    int d_average_count;
+    int d_decimation_output_factor;
 
     double d_preamble_time_seconds;
 
@@ -140,7 +125,6 @@ private:
     double Prn_timestamp_at_preamble_ms;
     bool flag_TOW_set;
     double delta_t; //GPS-GALILEO time offset
-
 
     std::string d_dump_filename;
     std::ofstream d_dump_file;

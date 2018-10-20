@@ -16,9 +16,11 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set(OBS_ADAPTER_SOURCES 
+set(OBS_ADAPTER_SOURCES
 	gps_l1_ca_observables.cc
+	gps_l2c_observables.cc
 	galileo_e1_observables.cc
+    galileo_e5a_observables.cc
 	hybrid_observables.cc
 )
 
@@ -35,6 +37,7 @@ include_directories(
 )
 
 file(GLOB OBS_ADAPTER_HEADERS "*.h")
+list(SORT OBS_ADAPTER_HEADERS)
 add_library(obs_adapters ${OBS_ADAPTER_SOURCES} ${OBS_ADAPTER_HEADERS})
 source_group(Headers FILES ${OBS_ADAPTER_HEADERS})
 target_link_libraries(obs_adapters obs_gr_blocks ${GNURADIO_RUNTIME_LIBRARIES})

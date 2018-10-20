@@ -35,22 +35,14 @@
  */
 
 #ifndef GNSS_SDR_GPS_L1_CA_TCP_CONNECTOR_TRACKING_CC_H
-#define	GNSS_SDR_GPS_L1_CA_TCP_CONNECTOR_TRACKING_CC_H
+#define GNSS_SDR_GPS_L1_CA_TCP_CONNECTOR_TRACKING_CC_H
 
 #include <fstream>
-#include <queue>
 #include <map>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
-#include "concurrent_queue.h"
-#include "gps_sdr_signal_processing.h"
 #include "gnss_synchro.h"
-#include "tracking_2nd_DLL_filter.h"
-#include "tracking_2nd_PLL_filter.h"
-#include "correlator.h"
+#include "cpu_multicorrelator.h"
 #include "tcp_communication.h"
 
 
@@ -63,11 +55,8 @@ gps_l1_ca_tcp_connector_tracking_cc_sptr
 gps_l1_ca_tcp_connector_make_tracking_cc(long if_freq,
                                    long fs_in, unsigned
                                    int vector_length,
-                                   boost::shared_ptr<gr::msg_queue> queue,
                                    bool dump,
                                    std::string dump_filename,
-                                   float pll_bw_hz,
-                                   float dll_bw_hz,
                                    float early_late_space_chips,
                                    size_t port_ch0);
 
@@ -83,7 +72,6 @@ public:
     void set_channel(unsigned int channel);
     void set_gnss_synchro(Gnss_Synchro* p_gnss_synchro);
     void start_tracking();
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
 
     /*
      * \brief just like gr_block::general_work, only this arranges to call consume_each for you
@@ -99,49 +87,35 @@ private:
     gps_l1_ca_tcp_connector_make_tracking_cc(long if_freq,
             long fs_in, unsigned
             int vector_length,
-            boost::shared_ptr<gr::msg_queue> queue,
             bool dump,
             std::string dump_filename,
-            float pll_bw_hz,
-            float dll_bw_hz,
             float early_late_space_chips,
             size_t port_ch0);
 
     Gps_L1_Ca_Tcp_Connector_Tracking_cc(long if_freq,
             long fs_in, unsigned
             int vector_length,
-            boost::shared_ptr<gr::msg_queue> queue,
             bool dump,
             std::string dump_filename,
-            float pll_bw_hz,
-            float dll_bw_hz,
             float early_late_space_chips,
             size_t port_ch0);
-    void update_local_code();
-    void update_local_carrier();
 
     // tracking configuration vars
-    boost::shared_ptr<gr::msg_queue> d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     unsigned int d_vector_length;
     bool d_dump;
 
     Gnss_Synchro* d_acquisition_gnss_synchro;
     unsigned int d_channel;
-    int d_last_seg;
+
     long d_if_freq;
     long d_fs_in;
-
+    int d_correlation_length_samples;
+    int d_n_correlator_taps;
     double d_early_late_spc_chips;
 
     double d_code_phase_step_chips;
 
     gr_complex* d_ca_code;
-
-    gr_complex* d_early_code;
-    gr_complex* d_late_code;
-    gr_complex* d_prompt_code;
-    gr_complex* d_carr_sign;
 
     gr_complex *d_Early;
     gr_complex *d_Prompt;
@@ -152,15 +126,13 @@ private:
     double d_next_rem_code_phase_samples;
     float d_rem_carr_phase_rad;
 
-    // PLL and DLL filter library
-    Tracking_2nd_DLL_filter d_code_loop_filter;
-    Tracking_2nd_PLL_filter d_carrier_loop_filter;
-
     // acquisition
     float d_acq_code_phase_samples;
     float d_acq_carrier_doppler_hz;
     // correlator
-    Correlator d_correlator;
+    float* d_local_code_shift_chips;
+    gr_complex* d_correlator_outs;
+    cpu_multicorrelator multicorrelator_cpu;
 
     // tracking vars
     double d_code_freq_hz;

@@ -34,48 +34,36 @@
 #include "galileo_e1b_telemetry_decoder.h"
 #include <gnuradio/io_signature.h>
 #include <glog/logging.h>
+#include "configuration_interface.h"
+#include "concurrent_queue.h"
 #include "galileo_ephemeris.h"
 #include "galileo_almanac.h"
 #include "galileo_iono.h"
 #include "galileo_utc_model.h"
-#include "configuration_interface.h"
-#include "galileo_e1b_telemetry_decoder_cc.h"
-
-extern concurrent_queue<Galileo_Ephemeris> global_galileo_ephemeris_queue;
-extern concurrent_queue<Galileo_Iono> global_galileo_iono_queue;
-extern concurrent_queue<Galileo_Utc_Model> global_galileo_utc_model_queue;
-extern concurrent_queue<Galileo_Almanac> global_galileo_almanac_queue;
-
 
 using google::LogMessage;
 
 GalileoE1BTelemetryDecoder::GalileoE1BTelemetryDecoder(ConfigurationInterface* configuration,
         std::string role,
         unsigned int in_streams,
-        unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
+        unsigned int out_streams) :
         role_(role),
         in_streams_(in_streams),
-        out_streams_(out_streams),
-        queue_(queue)
+        out_streams_(out_streams)
 {
-    std::string default_item_type = "gr_complex";
     std::string default_dump_filename = "./navigation.dat";
     DLOG(INFO) << "role " << role;
-    DLOG(INFO) << "vector length " << vector_length_;
-    vector_length_ = configuration->property(role + ".vector_length", 2048);
     dump_ = configuration->property(role + ".dump", false);
     dump_filename_ = configuration->property(role + ".dump_filename", default_dump_filename);
-    int fs_in;
-    fs_in = configuration->property("GNSS-SDR.internal_fs_hz", 2048000);
     // make telemetry decoder object
-    telemetry_decoder_ = galileo_e1b_make_telemetry_decoder_cc(satellite_, 0, (long)fs_in, vector_length_, queue_, dump_); // TODO fix me
+    telemetry_decoder_ = galileo_e1b_make_telemetry_decoder_cc(satellite_, dump_); // TODO fix me
     DLOG(INFO) << "telemetry_decoder(" << telemetry_decoder_->unique_id() << ")";
-    // set the navigation msg queue;
-    telemetry_decoder_->set_ephemeris_queue(&global_galileo_ephemeris_queue);
-    telemetry_decoder_->set_iono_queue(&global_galileo_iono_queue);
-    telemetry_decoder_->set_almanac_queue(&global_galileo_almanac_queue);
-    telemetry_decoder_->set_utc_model_queue(&global_galileo_utc_model_queue);
+
+    //decimation factor
+    int decimation_factor = configuration->property(role + ".decimation_factor", 1);
+    telemetry_decoder_->set_decimation(decimation_factor);
+
+    channel_ = 0;
 }
 
 
@@ -93,6 +81,7 @@ void GalileoE1BTelemetryDecoder::set_satellite(Gnss_Satellite satellite)
 
 void GalileoE1BTelemetryDecoder::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to connect internally
     DLOG(INFO) << "nothing to connect internally";
 }
@@ -100,6 +89,7 @@ void GalileoE1BTelemetryDecoder::connect(gr::top_block_sptr top_block)
 
 void GalileoE1BTelemetryDecoder::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     // Nothing to disconnect
 }
 

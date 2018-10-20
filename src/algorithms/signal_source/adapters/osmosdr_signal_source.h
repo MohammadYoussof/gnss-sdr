@@ -50,7 +50,7 @@ class ConfigurationInterface;
 class OsmosdrSignalSource: public GNSSBlockInterface
 {
 public:
-	OsmosdrSignalSource(ConfigurationInterface* configuration,
+    OsmosdrSignalSource(ConfigurationInterface* configuration,
             std::string role, unsigned int in_stream,
             unsigned int out_stream, boost::shared_ptr<gr::msg_queue> queue);
 
@@ -81,7 +81,7 @@ public:
 private:
     std::string role_;
 
-    // UHD SETTINGS
+    // Front-end settings
     bool AGC_enabled_;
     double sample_rate_;
 
@@ -100,6 +100,7 @@ private:
     std::string dump_filename_;
 
     osmosdr::source::sptr osmosdr_source_;
+    std::string osmosdr_args_;
 
     boost::shared_ptr<gr::block> valve_;
     gr::blocks::file_sink::sptr file_sink_;

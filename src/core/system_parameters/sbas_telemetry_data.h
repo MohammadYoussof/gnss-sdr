@@ -98,10 +98,6 @@ class Sbas_Telemetry_Data
 {
 public:
     int update(Sbas_Raw_Msg sbas_raw_msg);
-    void set_raw_msg_queue(concurrent_queue<Sbas_Raw_Msg> *raw_msg_queue);
-    void set_iono_queue(concurrent_queue<Sbas_Ionosphere_Correction> *iono_queue);
-    void set_sat_corr_queue(concurrent_queue<Sbas_Satellite_Correction> *sat_corr_queue);
-    void set_ephemeris_queue(concurrent_queue<Sbas_Ephemeris> *ephemeris_queue);
 
     /*!
      * Default constructor
@@ -117,11 +113,6 @@ private:
     std::map<int, Long_Term_Correction> emitted_long_term_corrections;
 
     Sbas_Time_Relation mt12_time_ref;
-
-    concurrent_queue<Sbas_Raw_Msg> *raw_msg_queue;
-    concurrent_queue<Sbas_Ionosphere_Correction> *iono_queue;
-    concurrent_queue<Sbas_Satellite_Correction> *sat_corr_queue;
-    concurrent_queue<Sbas_Ephemeris> *ephemeris_queue;
 
     int decode_mt12(Sbas_Raw_Msg sbas_raw_msg);
 
@@ -276,7 +267,7 @@ private:
 
     typedef struct {        /* SBAS long term satellite error correction type */
         //gtime_t t0;         /* correction time */
-        double trx;	    /* time when message was received */
+        double trx;        /* time when message was received */
         int tapp;           /* time of applicability (when vel=1 sent as t0) */
         int vel;            /* use velocity if vel=1 */
         bool valid;
@@ -326,17 +317,18 @@ private:
      */
 
     typedef struct {        /* SBAS ephemeris type */
-        int sat;            /* satellite number */
+        int sat = 0;            /* satellite number */
         //gtime_t t0;         /* reference epoch time (GPST) */
-        int t0;
+        int t0 = 0;
         //gtime_t tof;        /* time of message frame (GPST) */
-        double tof;
-        int sva;            /* SV accuracy (URA index) */
-        int svh;            /* SV health (0:ok) */
-        double pos[3];      /* satellite position (m) (ecef) */
-        double vel[3];      /* satellite velocity (m/s) (ecef) */
-        double acc[3];      /* satellite acceleration (m/s^2) (ecef) */
-        double af0,af1;     /* satellite clock-offset/drift (s,s/s) */
+        double tof = 0;
+        int sva = 0;            /* SV accuracy (URA index) */
+        int svh = 0;            /* SV health (0:ok) */
+        double pos[3] = {0, 0, 0};      /* satellite position (m) (ecef) */
+        double vel[3] = {0, 0, 0};      /* satellite velocity (m/s) (ecef) */
+        double acc[3] = {0, 0, 0};      /* satellite acceleration (m/s^2) (ecef) */
+        double af0 = 0;
+        double af1 = 0;     /* satellite clock-offset/drift (s,s/s) */
     } seph_t;
 
     typedef struct {        /* navigation data type */

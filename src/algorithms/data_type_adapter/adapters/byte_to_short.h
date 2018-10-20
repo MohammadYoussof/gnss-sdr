@@ -34,8 +34,6 @@
 #include <string>
 #include <gnuradio/blocks/char_to_short.h>
 #include <gnuradio/blocks/file_sink.h>
-#include <gnuradio/msg_queue.h>
-#include "gnss_synchro.h"
 #include "gnss_block_interface.h"
 
 
@@ -50,7 +48,7 @@ class ByteToShort: public GNSSBlockInterface
 public:
     ByteToShort(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~ByteToShort();
 
@@ -58,10 +56,10 @@ public:
     {
         return role_;
     }
-    //! Returns "ByteToShort"
+    //! Returns "Byte_To_Short"
     std::string implementation()
     {
-        return "ByteToShort";
+        return "Byte_To_Short";
     }
     size_t item_size()
     {
@@ -83,7 +81,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
     gr::blocks::file_sink::sptr file_sink_;
 };
 

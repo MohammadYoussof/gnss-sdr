@@ -31,35 +31,36 @@
  */
 
 #include "gps_sdr_signal_processing.h"
-#include <stdlib.h>
-#include <cmath>
 
+auto auxCeil = [](float x){ return static_cast<int>(static_cast<long>((x)+1)); };
 
 void gps_l1_ca_code_gen_complex(std::complex<float>* _dest, signed int _prn, unsigned int _chip_shift)
 {
-    unsigned int G1[1023];
-    unsigned int G2[1023];
-    unsigned int G1_register[10], G2_register[10];
-    unsigned int feedback1, feedback2;
+    const unsigned int _code_length = 1023;
+    bool G1[_code_length];
+    bool G2[_code_length];
+    bool G1_register[10], G2_register[10];
+    bool feedback1, feedback2;
+    bool aux;
     unsigned int lcv, lcv2;
     unsigned int delay;
     signed int prn_idx;
 
     /* G2 Delays as defined in GPS-ISD-200D */
-    signed int delays[51] = {5 /*PRN1*/, 6, 7, 8, 17, 18, 139, 140, 141, 251, 252, 254 ,255, 256, 257, 258, 469, 470, 471, 472,
+    const signed int delays[51] = {5 /*PRN1*/, 6, 7, 8, 17, 18, 139, 140, 141, 251, 252, 254 ,255, 256, 257, 258, 469, 470, 471, 472,
             473, 474, 509, 512, 513, 514, 515, 516, 859, 860, 861, 862 /*PRN32*/,
             145 /*PRN120*/, 175, 52, 21, 237, 235, 886, 657, 634, 762,
             355, 1012, 176, 603, 130, 359, 595, 68, 386 /*PRN138*/};
 
     // compute delay array index for given PRN number
     if(120 <= _prn && _prn <= 138)
-    {
-    	prn_idx = _prn - 88;	// SBAS PRNs are at array indices 31 to 50 (offset: -120+33-1 =-88)
-    }
+        {
+            prn_idx = _prn - 88;    // SBAS PRNs are at array indices 31 to 50 (offset: -120+33-1 =-88)
+        }
     else
-    {
-    	prn_idx = _prn-1;
-    }
+        {
+            prn_idx = _prn - 1;
+        }
 
     /* A simple error check */
     if((prn_idx < 0) || (prn_idx > 51))
@@ -72,7 +73,7 @@ void gps_l1_ca_code_gen_complex(std::complex<float>* _dest, signed int _prn, uns
         }
 
     /* Generate G1 & G2 Register */
-    for(lcv = 0; lcv < 1023; lcv++)
+    for(lcv = 0; lcv < _code_length; lcv++)
         {
             G1[lcv] = G1_register[0];
             G2[lcv] = G2_register[0];
@@ -91,21 +92,27 @@ void gps_l1_ca_code_gen_complex(std::complex<float>* _dest, signed int _prn, uns
         }
 
     /* Set the delay */
-    delay = 1023 - delays[prn_idx];
+    delay = _code_length - delays[prn_idx];
     delay += _chip_shift;
-    delay %= 1023;
+    delay %= _code_length;
+
     /* Generate PRN from G1 and G2 Registers */
-    for(lcv = 0; lcv < 1023; lcv++)
+    for(lcv = 0; lcv < _code_length; lcv++)
         {
-            _dest[lcv] = std::complex<float>(G1[(lcv +  _chip_shift)%1023]^G2[delay], 0);
-            if(_dest[lcv].real() == 0.0) //javi
+            aux = G1[(lcv + _chip_shift) % _code_length]^G2[delay];
+            if(aux == true)
                 {
-                    _dest[lcv].real(-1.0);
+                    _dest[lcv] = std::complex<float>(1, 0);
+                }
+            else
+                {
+                    _dest[lcv] = std::complex<float>(-1, 0);
                 }
             delay++;
-            delay %= 1023;
+            delay %= _code_length;
         }
 }
+
 
 
 /*
@@ -118,18 +125,19 @@ void gps_l1_ca_code_gen_complex_sampled(std::complex<float>* _dest, unsigned int
     signed int _samplesPerCode, _codeValueIndex;
     float _ts;
     float _tc;
+    float aux;
     const signed int _codeFreqBasis = 1023000; //Hz
     const signed int _codeLength = 1023;
 
     //--- Find number of samples per spreading code ----------------------------
-    _samplesPerCode = round(_fs / (_codeFreqBasis / _codeLength));
+    _samplesPerCode = static_cast<signed int>(static_cast<double>(_fs) / static_cast<double>(_codeFreqBasis / _codeLength));
 
     //--- Find time constants --------------------------------------------------
-    _ts = 1/(float)_fs;   // Sampling period in sec
-    _tc = 1/(float)_codeFreqBasis;  // C/A chip period in sec
-    gps_l1_ca_code_gen_complex(_code,_prn, _chip_shift); //generate C/A code 1 sample per chip
+    _ts = 1.0 / static_cast<float>(_fs);   // Sampling period in sec
+    _tc = 1.0 / static_cast<float>(_codeFreqBasis);  // C/A chip period in sec
+    gps_l1_ca_code_gen_complex(_code, _prn, _chip_shift); //generate C/A code 1 sample per chip
 
-    for (signed int i=0; i<_samplesPerCode; i++)
+    for (signed int i = 0; i < _samplesPerCode; i++)
         {
             //=== Digitizing =======================================================
 
@@ -138,7 +146,9 @@ void gps_l1_ca_code_gen_complex_sampled(std::complex<float>* _dest, unsigned int
             // number of samples per millisecond (because one C/A code period is one
             // millisecond).
 
-            _codeValueIndex = ceil((_ts * ((float)i + 1)) / _tc) - 1;
+            // _codeValueIndex = ceil((_ts * ((float)i + 1)) / _tc) - 1;
+            aux = (_ts * (i + 1)) / _tc;   
+            _codeValueIndex = auxCeil( aux ) - 1;
 
             //--- Make the digitized version of the C/A code -----------------------
             // The "upsampled" code is made by selecting values form the CA code
@@ -155,7 +165,4 @@ void gps_l1_ca_code_gen_complex_sampled(std::complex<float>* _dest, unsigned int
                 }
         }
 }
-
-
-
 

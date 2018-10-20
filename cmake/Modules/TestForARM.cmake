@@ -26,10 +26,13 @@ set (ARM_VERSION "")
 
 if (CMAKE_COMPILER_IS_GNUCXX)
   execute_process(COMMAND echo "int main(){}"
-                  COMMAND ${CMAKE_CXX_COMPILER} -dM -E -
-		  OUTPUT_VARIABLE TEST_FOR_ARM_RESULTS)
+                  COMMAND ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_ARG1} -dM -E -
+                  OUTPUT_VARIABLE TEST_FOR_ARM_RESULTS)
 
   string(REGEX MATCH "__arm" ARM_FOUND "${TEST_FOR_ARM_RESULTS}")
+  if(ARM_FOUND STREQUAL "")
+     string(REGEX MATCH "__aarch64" ARM_FOUND "${TEST_FOR_ARM_RESULTS}")
+  endif(ARM_FOUND STREQUAL "")
 
   if (NOT ARM_FOUND STREQUAL "")
     set(IS_ARM YES)
@@ -60,6 +63,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
     check_arm_version("__ARM_ARCH_7EM_" ${TEST_FOR_ARM_RESULTS} "armv7e-m" ARM_VERSION)
     check_arm_version("__ARM_ARCH_7VE__" ${TEST_FOR_ARM_RESULTS} "armv7ve" ARM_VERSION)
     check_arm_version("__ARM_ARCH_8A__" ${TEST_FOR_ARM_RESULTS} "armv8-a" ARM_VERSION)
+    check_arm_version("__ARM_ARCH_8A" ${TEST_FOR_ARM_RESULTS} "armv8-a" ARM_VERSION)
 
     # anything else just define as arm
     if (ARM_VERSION STREQUAL "")

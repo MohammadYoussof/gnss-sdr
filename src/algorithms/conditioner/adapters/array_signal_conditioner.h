@@ -36,7 +36,6 @@
 #include <string>
 #include <gnuradio/msg_queue.h>
 #include "gnss_block_interface.h"
-#include "control_message_factory.h"
 
 
 class ConfigurationInterface;
@@ -53,9 +52,8 @@ class ArraySignalConditioner: public GNSSBlockInterface
 public:
     //! Constructor
     ArraySignalConditioner(ConfigurationInterface *configuration,
-            GNSSBlockInterface *data_type_adapt, GNSSBlockInterface *in_filt,
-            GNSSBlockInterface *res, std::string role, std::string implementation,
-            boost::shared_ptr<gr::msg_queue> queue);
+            std::shared_ptr<GNSSBlockInterface> data_type_adapt, std::shared_ptr<GNSSBlockInterface> in_filt,
+            std::shared_ptr<GNSSBlockInterface> res, std::string role, std::string implementation);
 
     //! Virtual destructor
     virtual ~ArraySignalConditioner();
@@ -70,19 +68,18 @@ public:
     std::string implementation(){ return "Array_Signal_Conditioner"; }
     size_t item_size(){ return 0; }
 
-    GNSSBlockInterface *data_type_adapter(){ return data_type_adapt_; }
-    GNSSBlockInterface *input_filter(){ return in_filt_; }
-    GNSSBlockInterface *resampler(){ return res_; }
+    std::shared_ptr<GNSSBlockInterface> data_type_adapter(){ return data_type_adapt_; }
+    std::shared_ptr<GNSSBlockInterface> input_filter(){ return in_filt_; }
+    std::shared_ptr<GNSSBlockInterface> resampler(){ return res_; }
 
 private:
-    GNSSBlockInterface *data_type_adapt_;
-    GNSSBlockInterface *in_filt_;
-    GNSSBlockInterface *res_;
+    std::shared_ptr<GNSSBlockInterface> data_type_adapt_;
+    std::shared_ptr<GNSSBlockInterface> in_filt_;
+    std::shared_ptr<GNSSBlockInterface> res_;
     std::string role_;
     std::string implementation_;
     bool connected_;
     //bool stop_;
-    boost::shared_ptr<gr::msg_queue> queue_;
 };
 
 #endif /*GNSS_SDR_SIGNAL_CONDITIONER_H_*/

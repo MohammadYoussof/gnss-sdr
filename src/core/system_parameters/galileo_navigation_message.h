@@ -1,7 +1,7 @@
 /*!
  * \file galileo_navigation_message.h
  * \brief  Implementation of a Galileo I/NAV Data message
- *         as described in Galileo OS SIS ICD Issue 1.1 (Sept. 2010)
+ *         as described in Galileo OS SIS ICD Issue 1.2 (Nov. 2015)
  * \author Mara Branzanti 2013. mara.branzanti(at)gmail.com
  * \author Javier Arribas, 2013. jarribas(at)cttc.es
  *
@@ -33,25 +33,22 @@
 #ifndef GNSS_SDR_GALILEO_NAVIGATION_MESSAGE_H_
 #define GNSS_SDR_GALILEO_NAVIGATION_MESSAGE_H_
 
-#include <iostream>
-#include <map>
-#include <vector>
-#include <string>
-#include <algorithm>
 #include <bitset>
-#include <boost/assign.hpp>
-#include <boost/cstdint.hpp>  // for boost::uint16_t
-#include <cmath>
+#include <map>
+#include <string>
 #include <utility>
+#include <vector>
+#include <boost/cstdint.hpp>  // for boost::uint32_t
 #include "galileo_ephemeris.h"
 #include "galileo_iono.h"
 #include "galileo_almanac.h"
 #include "galileo_utc_model.h"
+#include "Galileo_E1.h"
 
 /*!
  * \brief This class handles the Galileo I/NAV Data message, as described in the
- * Galileo Open Service Signal in Space Interface Control Document (OS SIS ICD), Issue 1.1 (Sept 2010).
- * See http://ec.europa.eu/enterprise/policies/satnav/galileo/files/galileo-os-sis-icd-issue1-revision1_en.pdf
+ * Galileo Open Service Signal in Space Interface Control Document (OS SIS ICD), Issue 1.2 (Nov 2015).
+ * See https://www.gsc-europa.eu/system/files/galileo_documents/Galileo_OS_SIS_ICD.pdf
  */
 class Galileo_Navigation_Message
 {
@@ -76,7 +73,7 @@ public:
     bool flag_iono_and_GST;   //!< Flag indicating that ionospheric and GST parameters (word 5) have been received
     bool flag_TOW_5;
     bool flag_TOW_6;
-    bool flag_TOW_set; 	      //!< it is true when page 5 or page 6 arrives
+    bool flag_TOW_set;        //!< it is true when page 5 or page 6 arrives
     bool flag_utc_model;      //!< Flag indicating that utc model parameters (word 6) have been received
 
     bool flag_all_almanac;    //!< Flag indicating that all almanac have been received
@@ -108,8 +105,8 @@ public:
     double iDot_2;            //!< Rate of inclination angle [semi-circles/sec]
 
     /*Word type 3: Ephemeris (3/4) and SISA*/
-    int IOD_nav_3;  		//
-    double OMEGA_dot_3;	      //!< Rate of right ascension [semi-circles/sec]
+    int IOD_nav_3;            //
+    double OMEGA_dot_3;       //!< Rate of right ascension [semi-circles/sec]
     double delta_n_3;         //!< Mean motion difference from computed value  [semi-circles/sec]
     double C_uc_3;            //!< Amplitude of the cosine harmonic correction term to the argument of latitude [radians]
     double C_us_3;            //!< Amplitude of the sine harmonic correction term to the argument of latitude [radians]
@@ -118,8 +115,8 @@ public:
     double SISA_3;
 
     /*Word type 4: Ephemeris (4/4) and Clock correction parameters*/
-    int IOD_nav_4;	       //
-    int SV_ID_PRN_4;	       //
+    int IOD_nav_4;             //
+    int SV_ID_PRN_4;           //
     double C_ic_4;             //!<Amplitude of the cosine harmonic correction term to the angle of inclination [radians]
     double C_is_4;             //!< Amplitude of the sine harmonic correction term to the angle of inclination [radians]
     /*Clock correction parameters*/

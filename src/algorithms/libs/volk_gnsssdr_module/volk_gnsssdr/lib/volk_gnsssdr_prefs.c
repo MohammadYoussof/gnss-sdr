@@ -21,22 +21,30 @@
 #include <string.h>
 #include <volk_gnsssdr/volk_gnsssdr_prefs.h>
 
-//#if defined(_WIN32)
-//#include <Windows.h>
-//#endif
 
 void volk_gnsssdr_get_config_path(char *path)
 {
+    if (!path) return;
     const char *suffix = "/.volk_gnsssdr/volk_gnsssdr_config";
+    const char *suffix2 = "/volk_gnsssdr/volk_gnsssdr_config"; //non-hidden
     char *home = NULL;
+
+    //allows config redirection via env variable
+    home = getenv("VOLK_CONFIGPATH");
+    if(home!=NULL){
+        strncpy(path,home,512);
+        strcat(path,suffix2);
+        return;
+    }
+
     if (home == NULL) home = getenv("HOME");
     if (home == NULL) home = getenv("APPDATA");
     if (home == NULL)
         {
-            path = NULL;
+            path[0] = 0;
             return;
         }
-    strcpy(path, home);
+    strncpy(path, home, 512);
     strcat(path, suffix);
 }
 
@@ -49,7 +57,7 @@ size_t volk_gnsssdr_load_preferences(volk_gnsssdr_arch_pref_t **prefs_res)
 
     //get the config path
     volk_gnsssdr_get_config_path(path);
-    if (path == NULL) return n_arch_prefs; //no prefs found
+    if (!path[0]) return n_arch_prefs; //no prefs found
     config_file = fopen(path, "r");
     if(!config_file) return n_arch_prefs; //no prefs found
 

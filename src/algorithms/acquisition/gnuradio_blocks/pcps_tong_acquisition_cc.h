@@ -52,15 +52,10 @@
 #define GNSS_SDR_PCPS_TONG_ACQUISITION_CC_H_
 
 #include <fstream>
-#include <queue>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "gnss_synchro.h"
 
 class pcps_tong_acquisition_cc;
@@ -71,7 +66,7 @@ pcps_tong_acquisition_cc_sptr
 pcps_tong_make_acquisition_cc(unsigned int sampled_ms, unsigned int doppler_max,
                               long freq, long fs_in, int samples_per_ms,
                               int samples_per_code, unsigned int tong_init_val,
-                              unsigned int tong_max_val, gr::msg_queue::sptr queue,
+                              unsigned int tong_max_val, unsigned int tong_max_dwells,
                               bool dump, std::string dump_filename);
 
 /*!
@@ -85,13 +80,13 @@ private:
     pcps_tong_make_acquisition_cc(unsigned int sampled_ms, unsigned int doppler_max,
             long freq, long fs_in, int samples_per_ms,
             int samples_per_code, unsigned int tong_init_val,
-            unsigned int tong_max_val, gr::msg_queue::sptr queue,
+            unsigned int tong_max_val, unsigned int tong_max_dwells,
             bool dump, std::string dump_filename);
 
     pcps_tong_acquisition_cc(unsigned int sampled_ms, unsigned int doppler_max,
             long freq, long fs_in, int samples_per_ms,
             int samples_per_code, unsigned int tong_init_val,
-            unsigned int tong_max_val, gr::msg_queue::sptr queue,
+            unsigned int tong_max_val, unsigned int tong_max_dwells,
             bool dump, std::string dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int doppler_shift,
@@ -107,10 +102,11 @@ private:
     unsigned int d_doppler_max;
     unsigned int d_doppler_step;
     unsigned int d_sampled_ms;
-    unsigned int d_well_count;
+    unsigned int d_dwell_count;
     unsigned int d_tong_count;
     unsigned int d_tong_init_val;
     unsigned int d_tong_max_val;
+    unsigned int d_tong_max_dwells;
     unsigned int d_fft_size;
     unsigned long int d_sample_counter;
     gr_complex** d_grid_doppler_wipeoffs;
@@ -126,8 +122,6 @@ private:
     float* d_magnitude;
     float d_input_power;
     float d_test_statistics;
-    gr::msg_queue::sptr d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     std::ofstream d_dump_file;
     bool d_active;
     int d_state;
@@ -181,6 +175,13 @@ public:
      }
 
      /*!
+      * \brief If set to 1, ensures that acquisition starts at the
+      * first available sample.
+      * \param state - int=1 forces start of acquisition
+      */
+     void set_state(int state);
+
+     /*!
       * \brief Set acquisition channel unique ID
       * \param channel - receiver channel.
       */
@@ -217,15 +218,6 @@ public:
          d_doppler_step = doppler_step;
      }
 
-
-     /*!
-      * \brief Set tracking channel internal queue.
-      * \param channel_internal_queue - Channel's internal blocks information queue.
-      */
-     void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-     {
-         d_channel_internal_queue = channel_internal_queue;
-     }
 
      /*!
       * \brief Parallel Code Phase Search Acquisition signal processing.

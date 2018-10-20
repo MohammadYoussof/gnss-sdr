@@ -9,7 +9,7 @@
  *  <li> Perform the FFT-based circular convolution (parallel time search)
  *  <li> Record the maximum peak and the associated synchronization parameters
  *  <li> Compute the test statistics and compare to the threshold
- *  <li> Declare positive or negative acquisition using a message queue
+ *  <li> Declare positive or negative acquisition using a message port
  *  </ol>
  *
  * Kay Borre book: K.Borre, D.M.Akos, N.Bertelsen, P.Rinder, and S.H.Jensen,
@@ -52,16 +52,11 @@
 
 #include <algorithm>
 #include <fstream>
-#include <queue>
 #include <string>
 #include <vector>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "gnss_synchro.h"
 
 class pcps_multithread_acquisition_cc;
@@ -73,7 +68,7 @@ pcps_make_multithread_acquisition_cc(unsigned int sampled_ms, unsigned int max_d
                          unsigned int doppler_max, long freq, long fs_in,
                          int samples_per_ms, int samples_per_code,
                          bool bit_transition_flag,
-                         gr::msg_queue::sptr queue, bool dump,
+                         bool dump,
                          std::string dump_filename);
 
 /*!
@@ -90,7 +85,7 @@ private:
                              unsigned int doppler_max, long freq, long fs_in,
                              int samples_per_ms, int samples_per_code,
                              bool bit_transition_flag,
-                             gr::msg_queue::sptr queue, bool dump,
+                             bool dump,
                              std::string dump_filename);
 
 
@@ -98,49 +93,47 @@ private:
                         unsigned int doppler_max, long freq, long fs_in,
                         int samples_per_ms, int samples_per_code,
                         bool bit_transition_flag,
-                        gr::msg_queue::sptr queue, bool dump,
+                        bool dump,
                         std::string dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int doppler_shift,
             int doppler_offset);
 
 
-	long d_fs_in;
-	long d_freq;
-	int d_samples_per_ms;
+    long d_fs_in;
+    long d_freq;
+    int d_samples_per_ms;
     int d_samples_per_code;
-	unsigned int d_doppler_resolution;
-	float d_threshold;
+    unsigned int d_doppler_resolution;
+    float d_threshold;
     std::string d_satellite_str;
-	unsigned int d_doppler_max;
-	unsigned int d_doppler_step;
-	unsigned int d_sampled_ms;
+    unsigned int d_doppler_max;
+    unsigned int d_doppler_step;
+    unsigned int d_sampled_ms;
     unsigned int d_max_dwells;
     unsigned int d_well_count;
-	unsigned int d_fft_size;
-	unsigned long int d_sample_counter;
+    unsigned int d_fft_size;
+    unsigned long int d_sample_counter;
     gr_complex** d_grid_doppler_wipeoffs;
     unsigned int d_num_doppler_bins;
-	gr_complex* d_fft_codes;
-	gr::fft::fft_complex* d_fft_if;
-	gr::fft::fft_complex* d_ifft;
+    gr_complex* d_fft_codes;
+    gr::fft::fft_complex* d_fft_if;
+    gr::fft::fft_complex* d_ifft;
     Gnss_Synchro *d_gnss_synchro;
-	unsigned int d_code_phase;
-	float d_doppler_freq;
-	float d_mag;
+    unsigned int d_code_phase;
+    float d_doppler_freq;
+    float d_mag;
     float* d_magnitude;
-	float d_input_power;
-	float d_test_statistics;
+    float d_input_power;
+    float d_test_statistics;
     bool d_bit_transition_flag;
-    gr::msg_queue::sptr d_queue;
-	concurrent_queue<int> *d_channel_internal_queue;
-	std::ofstream d_dump_file;
-	bool d_active;
+    std::ofstream d_dump_file;
+    bool d_active;
     int d_state;
     bool d_core_working;
-	bool d_dump;
-	unsigned int d_channel;
-	std::string d_dump_filename;
+    bool d_dump;
+    unsigned int d_channel;
+    std::string d_dump_filename;
     gr_complex** d_in_buffer;
     std::vector<unsigned long int> d_sample_counter_buffer;
     unsigned int d_in_dwell_count;
@@ -191,6 +184,13 @@ public:
     }
 
     /*!
+     * \brief If set to 1, ensures that acquisition starts at the
+     * first available sample.
+     * \param state - int=1 forces start of acquisition
+     */
+    void set_state(int state);
+
+    /*!
      * \brief Set acquisition channel unique ID
      * \param channel - receiver channel.
      */
@@ -227,15 +227,6 @@ public:
         d_doppler_step = doppler_step;
     }
 
-
-    /*!
-     * \brief Set tracking channel internal queue.
-     * \param channel_internal_queue - Channel's internal blocks information queue.
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-    {
-        d_channel_internal_queue = channel_internal_queue;
-    }
 
     /*!
      * \brief Parallel Code Phase Search Acquisition signal processing.

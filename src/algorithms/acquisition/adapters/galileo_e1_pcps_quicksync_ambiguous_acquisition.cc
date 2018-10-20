@@ -30,11 +30,9 @@
  */
 
 #include "galileo_e1_pcps_quicksync_ambiguous_acquisition.h"
-#include <iostream>
 #include <boost/lexical_cast.hpp>
 #include <boost/math/distributions/exponential.hpp>
 #include <glog/logging.h>
-#include <cmath>
 #include "galileo_e1_signal_processing.h"
 #include "Galileo_E1.h"
 #include "configuration_interface.h"
@@ -43,9 +41,8 @@ using google::LogMessage;
 
 GalileoE1PcpsQuickSyncAmbiguousAcquisition::GalileoE1PcpsQuickSyncAmbiguousAcquisition(
         ConfigurationInterface* configuration, std::string role,
-        unsigned int in_streams, unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
-               role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
+        unsigned int in_streams, unsigned int out_streams) :
+               role_(role), in_streams_(in_streams), out_streams_(out_streams)
 {
     configuration_ = configuration;
     std::string default_item_type = "gr_complex";
@@ -57,9 +54,9 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::GalileoE1PcpsQuickSyncAmbiguousAcqui
             default_item_type);
 
     fs_in_ = configuration_->property("GNSS-SDR.internal_fs_hz", 4000000);
-    if_ = configuration_->property(role + ".ifreq", 0);
+    if_ = configuration_->property(role + ".if", 0);
     dump_ = configuration_->property(role + ".dump", false);
-    shift_resolution_ = configuration_->property(role + ".doppler_max", 15);
+    doppler_max_ = configuration_->property(role + ".doppler_max", 5000);
     sampled_ms_ = configuration_->property(role + ".coherent_integration_time_ms", 8);
 
     /*--- Find number of samples per spreading code (4 ms)  -----------------*/
@@ -76,10 +73,10 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::GalileoE1PcpsQuickSyncAmbiguousAcqui
     lues different that the expressed in the paper. In adition, it is important to point
     out that by making the folding factor smaller we were able to get QuickSync work with 
     Galileo. Future work should be directed to test this asumption statistically.*/
-    
+
     //folding_factor_ = (unsigned int)ceil(sqrt(log2(code_length_)));
     folding_factor_ = configuration_->property(role + ".folding_factor", 2);
-    
+
     if (sampled_ms_ % (folding_factor_*4) != 0)
         {
             LOG(WARNING) << "QuickSync Algorithm requires a coherent_integration_time"
@@ -99,8 +96,8 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::GalileoE1PcpsQuickSyncAmbiguousAcqui
                     << sampled_ms_ << " ms will be used.";
 
         }
-   // vector_length_ = (sampled_ms_/folding_factor_) * code_length_;
-	vector_length_ = sampled_ms_ * samples_per_ms;
+    // vector_length_ = (sampled_ms_/folding_factor_) * code_length_;
+    vector_length_ = sampled_ms_ * samples_per_ms;
     bit_transition_flag_ = configuration_->property(role + ".bit_transition_flag", false);
 
     if (!bit_transition_flag_)
@@ -116,30 +113,35 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::GalileoE1PcpsQuickSyncAmbiguousAcqui
             default_dump_filename);
 
     code_ = new gr_complex[code_length_];
-    LOG(INFO) <<"Vector Length: "<<vector_length_
-            <<", Samples per ms: "<<samples_per_ms
-            <<", Folding factor: "<<folding_factor_
-            <<", Sampled  ms: "<<sampled_ms_
-            <<", Code Length: "<<code_length_;
+    LOG(INFO) << "Vector Length: " << vector_length_
+            << ", Samples per ms: " << samples_per_ms
+            << ", Folding factor: " << folding_factor_
+            << ", Sampled  ms: " << sampled_ms_
+            << ", Code Length: " << code_length_;
     if (item_type_.compare("gr_complex") == 0)
         {
             item_size_ = sizeof(gr_complex);
             acquisition_cc_ = pcps_quicksync_make_acquisition_cc(folding_factor_,
-                    sampled_ms_, max_dwells_, shift_resolution_, if_, fs_in_,
-                    samples_per_ms, code_length_, bit_transition_flag_, queue_,
+                    sampled_ms_, max_dwells_, doppler_max_, if_, fs_in_,
+                    samples_per_ms, code_length_, bit_transition_flag_,
                     dump_, dump_filename_);
             stream_to_vector_ = gr::blocks::stream_to_vector::make(item_size_,
                     vector_length_);
             DLOG(INFO) << "stream_to_vector_quicksync("
                     << stream_to_vector_->unique_id() << ")";
             DLOG(INFO) << "acquisition_quicksync(" << acquisition_cc_->unique_id()
-                           << ")";
+                                   << ")";
         }
     else
         {
-            LOG(WARNING) << item_type_
-                    << " unknown acquisition item type";
+            item_size_ = sizeof(gr_complex);
+            LOG(WARNING) << item_type_ << " unknown acquisition item type";
         }
+
+    channel_ = 0;
+    threshold_ = 0.0;
+    doppler_step_ = 0;
+    gnss_synchro_ = 0;
 }
 
 
@@ -207,19 +209,6 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::set_doppler_step(unsigned int dopple
             acquisition_cc_->set_doppler_step(doppler_step_);
         }
 }
-
-
-void
-GalileoE1PcpsQuickSyncAmbiguousAcquisition::set_channel_queue(
-        concurrent_queue<int> *channel_internal_queue)
-{
-    channel_internal_queue_ = channel_internal_queue;
-    if (item_type_.compare("gr_complex") == 0)
-        {
-            acquisition_cc_->set_channel_queue(channel_internal_queue_);
-        }
-}
-
 
 void
 GalileoE1PcpsQuickSyncAmbiguousAcquisition::set_gnss_synchro(
@@ -294,6 +283,16 @@ GalileoE1PcpsQuickSyncAmbiguousAcquisition::reset()
         }
 }
 
+void GalileoE1PcpsQuickSyncAmbiguousAcquisition::set_state(int state)
+{
+    if (item_type_.compare("gr_complex") == 0)
+    {
+        acquisition_cc_->set_state(state);
+    }
+}
+
+
+
 float GalileoE1PcpsQuickSyncAmbiguousAcquisition::calculate_threshold(float pfa)
 {
     unsigned int frequency_bins = 0;
@@ -302,14 +301,14 @@ float GalileoE1PcpsQuickSyncAmbiguousAcquisition::calculate_threshold(float pfa)
             frequency_bins++;
         }
 
-    DLOG(INFO) <<"Channel "<<channel_<<"  Pfa = "<< pfa;
+    DLOG(INFO) << "Channel " << channel_ << "  Pfa = " << pfa;
 
-    unsigned int ncells = code_length_/folding_factor_ * frequency_bins;
-    double exponent = 1 / static_cast<double>(ncells);
+    unsigned int ncells = code_length_ / folding_factor_ * frequency_bins;
+    double exponent = 1.0 / static_cast<double>(ncells);
     double val = pow(1.0 - pfa, exponent);
-    double lambda = double(code_length_/folding_factor_);
+    double lambda = static_cast<double>(code_length_) / static_cast<double>(folding_factor_);
     boost::math::exponential_distribution<double> mydist (lambda);
-    float threshold = (float)quantile(mydist,val);
+    float threshold = static_cast<float>(quantile(mydist,val));
 
     return threshold;
 }

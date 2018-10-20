@@ -29,13 +29,12 @@
 * -------------------------------------------------------------------------
 */
 
-
-
-
+#include <cmath>
 #include <iostream>
 #include <queue>
 #include <memory>
 #include <boost/thread.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/filesystem.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -47,8 +46,10 @@
 #include "gps_navigation_message.h"
 
 #include "gps_ephemeris.h"
+#include "gps_cnav_ephemeris.h"
 #include "gps_almanac.h"
 #include "gps_iono.h"
+#include "gps_cnav_iono.h"
 #include "gps_utc_model.h"
 
 #include "galileo_ephemeris.h"
@@ -68,92 +69,92 @@ using google::LogMessage;
 
 DECLARE_string(log_dir);
 
-#include "arithmetic/complex_carrier_test.cc"
-#include "arithmetic/conjugate_test.cc"
-#include "arithmetic/magnitude_squared_test.cc"
-#include "arithmetic/multiply_test.cc"
-#include "configuration/file_configuration_test.cc"
-#include "configuration/in_memory_configuration_test.cc"
-#include "control_thread/control_message_factory_test.cc"
-#include "control_thread/control_thread_test.cc"
-#include "flowgraph/pass_through_test.cc"
-#include "flowgraph/gnss_flowgraph_test.cc"
-#include "gnss_block/gnss_block_factory_test.cc"
-#include "gnss_block/rtcm_printer_test.cc"
-#include "gnss_block/file_output_filter_test.cc"
-#include "gnss_block/file_signal_source_test.cc"
-#include "gnss_block/fir_filter_test.cc"
-#include "gnss_block/gps_l1_ca_pcps_acquisition_test.cc"
-#include "gnss_block/gps_l1_ca_pcps_acquisition_gsoc2013_test.cc"
-//#include "gnss_block/gps_l1_ca_pcps_multithread_acquisition_gsoc2013_test.cc"
+#include "unit-tests/arithmetic/complex_carrier_test.cc"
+#include "unit-tests/arithmetic/conjugate_test.cc"
+#include "unit-tests/arithmetic/magnitude_squared_test.cc"
+#include "unit-tests/arithmetic/multiply_test.cc"
+#include "unit-tests/arithmetic/code_generation_test.cc"
+#include "unit-tests/arithmetic/fft_length_test.cc"
+
+#include "unit-tests/control-plane/file_configuration_test.cc"
+#include "unit-tests/control-plane/in_memory_configuration_test.cc"
+#include "unit-tests/control-plane/control_message_factory_test.cc"
+#include "unit-tests/control-plane/control_thread_test.cc"
+#include "unit-tests/control-plane/gnss_flowgraph_test.cc"
+#include "unit-tests/control-plane/string_converter_test.cc"
+#include "unit-tests/control-plane/gnss_block_factory_test.cc"
+
+#include "unit-tests/signal-processing-blocks/sources/file_signal_source_test.cc"
+#include "unit-tests/signal-processing-blocks/sources/gnss_sdr_valve_test.cc"
+
+#include "unit-tests/signal-processing-blocks/adapter/pass_through_test.cc"
+
+#include "unit-tests/signal-processing-blocks/filter/fir_filter_test.cc"
+
+#include "unit-tests/signal-processing-blocks/resampler/direct_resampler_conditioner_cc_test.cc"
+
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_quicksync_acquisition_gsoc2014_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_tong_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_gsoc_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_ambiguous_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_8ms_ambiguous_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_tong_ambiguous_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_cccwsr_ambiguous_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e1_pcps_quicksync_ambiguous_acquisition_gsoc2014_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/galileo_e5a_pcps_acquisition_gsoc2014_gensource_test.cc"
+//#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_multithread_acquisition_gsoc2013_test.cc"
 #if OPENCL_BLOCKS_TEST
-#include "gnss_block/gps_l1_ca_pcps_opencl_acquisition_gsoc2013_test.cc"
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l1_ca_pcps_opencl_acquisition_gsoc2013_test.cc"
 #endif
-#include "gnss_block/gps_l1_ca_pcps_quicksync_acquisition_gsoc2014_test.cc"
-#include "gnss_block/gps_l1_ca_pcps_tong_acquisition_gsoc2013_test.cc"
-#include "gnss_block/galileo_e1_pcps_ambiguous_acquisition_test.cc"
-#include "gnss_block/galileo_e1_pcps_ambiguous_acquisition_gsoc_test.cc"
-#include "gnss_block/galileo_e1_pcps_ambiguous_acquisition_gsoc2013_test.cc"
-#include "gnss_block/galileo_e1_pcps_8ms_ambiguous_acquisition_gsoc2013_test.cc"
-#include "gnss_block/galileo_e1_pcps_tong_ambiguous_acquisition_gsoc2013_test.cc"
-#include "gnss_block/galileo_e1_pcps_cccwsr_ambiguous_acquisition_gsoc2013_test.cc"
-#include "gnss_block/galileo_e1_pcps_quicksync_ambiguous_acquisition_gsoc2014_test.cc"
-#include "gnss_block/galileo_e1_dll_pll_veml_tracking_test.cc"
-#include "gnuradio_block/gnss_sdr_valve_test.cc"
-#include "gnuradio_block/direct_resampler_conditioner_cc_test.cc"
-#include "string_converter/string_converter_test.cc"
 
-//#include "gnss_block/galileo_e5a_pcps_acquisition_test.cc"
-//#include "gnss_block/galileo_e5a_pcps_acquisition_test_2.cc"
-#include "gnss_block/galileo_e5a_pcps_acquisition_gsoc2014_gensource_test.cc"
-#include "gnss_block/galileo_e5a_tracking_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/galileo_e1_dll_pll_veml_tracking_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/galileo_e5a_tracking_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/tracking_loop_filter_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/cpu_multicorrelator_test.cc"
 
+#if CUDA_BLOCKS_TEST
+#include "unit-tests/signal-processing-blocks/tracking/gpu_multicorrelator_test.cc"
+#endif
 
+#include "unit-tests/signal-processing-blocks/pvt/rtcm_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rtcm_printer_test.cc"
+#include "unit-tests/signal-processing-blocks/pvt/rinex_printer_test.cc"
 
-concurrent_queue<Gps_Ephemeris> global_gps_ephemeris_queue;
-concurrent_queue<Gps_Iono> global_gps_iono_queue;
-concurrent_queue<Gps_Utc_Model> global_gps_utc_model_queue;
-concurrent_queue<Gps_Almanac> global_gps_almanac_queue;
+#if EXTRA_TESTS
+#include "unit-tests/signal-processing-blocks/acquisition/gps_l2_m_pcps_acquisition_test.cc"
+#include "unit-tests/signal-processing-blocks/tracking/gps_l2_m_dll_pll_tracking_test.cc"
+#if MODERN_ARMADILLO
+#include "unit-tests/signal-processing-blocks/tracking/gps_l1_ca_dll_pll_tracking_test.cc"
+#include "unit-tests/signal-processing-blocks/telemetry_decoder/gps_l1_ca_telemetry_decoder_test.cc"
+#endif
+#endif
+
+// For GPS NAVIGATION (L1)
 concurrent_queue<Gps_Acq_Assist> global_gps_acq_assist_queue;
-concurrent_queue<Gps_Ref_Location> global_gps_ref_location_queue;
-concurrent_queue<Gps_Ref_Time> global_gps_ref_time_queue;
-
-concurrent_map<Gps_Ephemeris> global_gps_ephemeris_map;
-concurrent_map<Gps_Iono> global_gps_iono_map;
-concurrent_map<Gps_Utc_Model> global_gps_utc_model_map;
-concurrent_map<Gps_Almanac> global_gps_almanac_map;
 concurrent_map<Gps_Acq_Assist> global_gps_acq_assist_map;
-concurrent_map<Gps_Ref_Location> global_gps_ref_location_map;
-concurrent_map<Gps_Ref_Time> global_gps_ref_time_map;
-
-// For GALILEO NAVIGATION
-concurrent_queue<Galileo_Ephemeris> global_galileo_ephemeris_queue;
-concurrent_queue<Galileo_Iono> global_galileo_iono_queue;
-concurrent_queue<Galileo_Utc_Model> global_galileo_utc_model_queue;
-concurrent_queue<Galileo_Almanac> global_galileo_almanac_queue;
-
-concurrent_map<Galileo_Ephemeris> global_galileo_ephemeris_map;
-concurrent_map<Galileo_Iono> global_galileo_iono_map;
-concurrent_map<Galileo_Utc_Model> global_galileo_utc_model_map;
-concurrent_map<Galileo_Almanac> global_galileo_almanac_map;
-
-// For SBAS CORRECTIONS
-concurrent_queue<Sbas_Raw_Msg> global_sbas_raw_msg_queue;
-concurrent_queue<Sbas_Ionosphere_Correction> global_sbas_iono_queue;
-concurrent_queue<Sbas_Satellite_Correction> global_sbas_sat_corr_queue;
-concurrent_queue<Sbas_Ephemeris> global_sbas_ephemeris_queue;
-
-concurrent_map<Sbas_Ionosphere_Correction> global_sbas_iono_map;
-concurrent_map<Sbas_Satellite_Correction> global_sbas_sat_corr_map;
-concurrent_map<Sbas_Ephemeris> global_sbas_ephemeris_map;
-
-
 
 int main(int argc, char **argv)
 {
     std::cout << "Running GNSS-SDR Tests..." << std::endl;
-    testing::InitGoogleTest(&argc, argv);
+    int res = 0;
+    try
+    {
+            testing::InitGoogleTest(&argc, argv);
+    }
+    catch(...) {} // catch the "testing::internal::<unnamed>::ClassUniqueToAlwaysTrue" from gtest
     google::ParseCommandLineFlags(&argc, &argv, true);
     google::InitGoogleLogging(argv[0]);
-    return RUN_ALL_TESTS();
+    try
+    {
+            res = RUN_ALL_TESTS();
+    }
+    catch(...)
+    {
+            LOG(WARNING) << "Unexpected catch";
+    }
+    google::ShutDownCommandLineFlags();
+    return res;
 }

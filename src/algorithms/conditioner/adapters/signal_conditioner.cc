@@ -30,38 +30,26 @@
  */
 
 #include "signal_conditioner.h"
-#include <iostream>
-#include <sstream>
-#include <boost/lexical_cast.hpp>
-#include <boost/thread/thread.hpp>
-#include <gnuradio/io_signature.h>
-#include <gnuradio/message.h>
 #include <glog/logging.h>
-#include "gnss_flowgraph.h"
 
 
 using google::LogMessage;
 
 // Constructor
 SignalConditioner::SignalConditioner(ConfigurationInterface *configuration,
-        GNSSBlockInterface *data_type_adapt, GNSSBlockInterface *in_filt,
-        GNSSBlockInterface *res, std::string role, std::string implementation,
-        boost::shared_ptr<gr::msg_queue> queue) : data_type_adapt_(data_type_adapt),
-                in_filt_(in_filt), res_(res), role_(role), implementation_(implementation),
-                queue_(queue)
+        std::shared_ptr<GNSSBlockInterface> data_type_adapt, std::shared_ptr<GNSSBlockInterface> in_filt,
+        std::shared_ptr<GNSSBlockInterface> res, std::string role, std::string implementation) :
+                data_type_adapt_(data_type_adapt),
+                in_filt_(in_filt), res_(res), role_(role), implementation_(implementation)
 {
     connected_ = false;
+    if(configuration){ };
 }
 
 
 // Destructor
 SignalConditioner::~SignalConditioner()
-{
-    delete data_type_adapt_;
-    delete in_filt_;
-    delete res_;
-}
-
+{}
 
 
 void SignalConditioner::connect(gr::top_block_sptr top_block)
@@ -75,19 +63,13 @@ void SignalConditioner::connect(gr::top_block_sptr top_block)
     in_filt_->connect(top_block);
     res_->connect(top_block);
 
-    top_block->connect(data_type_adapt_->get_right_block(), 0,
-                       in_filt_->get_left_block(), 0);
-
+    top_block->connect(data_type_adapt_->get_right_block(), 0, in_filt_->get_left_block(), 0);
     DLOG(INFO) << "data_type_adapter -> input_filter";
 
-    top_block->connect(in_filt_->get_right_block(), 0,
-                       res_->get_left_block(), 0);
-
+    top_block->connect(in_filt_->get_right_block(), 0, res_->get_left_block(), 0);
     DLOG(INFO) << "input_filter -> resampler";
-
     connected_ = true;
 }
-
 
 
 void SignalConditioner::disconnect(gr::top_block_sptr top_block)
@@ -115,8 +97,6 @@ gr::basic_block_sptr SignalConditioner::get_left_block()
 {
     return data_type_adapt_->get_left_block();
 }
-
-
 
 gr::basic_block_sptr SignalConditioner::get_right_block()
 {

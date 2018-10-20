@@ -1,4 +1,3 @@
-/* -*- c++ -*- */
 /* Copyright (C) 2010-2015 (see AUTHORS file for a list of contributors)
  *
  * This file is part of GNSS-SDR.
@@ -21,11 +20,10 @@
 #include <config.h>
 #endif
 
-#include <iostream>
-#include <boost/program_options.hpp>
-#include "volk_gnsssdr/constants.h"
+#include <volk_gnsssdr/constants.h>
 #include "volk_gnsssdr/volk_gnsssdr.h"
-
+#include <boost/program_options.hpp>
+#include <iostream>
 
 namespace po = boost::program_options;
 
@@ -37,14 +35,15 @@ main(int argc, char **argv)
 
   desc.add_options()
     ("help,h", "print help message")
-    ("prefix", "print VOLK installation prefix")
-    ("builddate", "print VOLK build date (RFC2822 format)")
-    ("cc", "print VOLK C compiler version")
-    ("cflags", "print VOLK CFLAGS")
-    ("all-machines", "print VOLK machines built into library")
-    ("avail-machines", "print VOLK machines the current platform can use")
-    ("machine", "print the VOLK machine that will be used")
-    ("version,v", "print VOLK version")
+    ("prefix", "print VOLK_GNSSSDR installation prefix")
+    ("cc", "print VOLK_GNSSSDR C compiler version")
+    ("cflags", "print VOLK_GNSSSDR CFLAGS")
+    ("all-machines", "print VOLK_GNSSSDR machines built into library")
+    ("avail-machines", "print VOLK_GNSSSDR machines the current platform can use")
+    ("machine", "print the VOLK_GNSSSDR machine that will be used")
+    ("alignment", "print the alignment that will be used")
+    ("malloc", "print malloc implementation that will be used")
+    ("version,v", "print VOLK_GNSSSDR version")
     ;
 
   try {
@@ -64,9 +63,6 @@ main(int argc, char **argv)
 
   if(vm.count("prefix"))
     std::cout << volk_gnsssdr_prefix() << std::endl;
-
-  if(vm.count("builddate"))
-    std::cout << volk_gnsssdr_build_date() << std::endl;
 
   if(vm.count("version"))
     std::cout << volk_gnsssdr_version() << std::endl;
@@ -89,6 +85,23 @@ main(int argc, char **argv)
   if(vm.count("machine")) {
     std::cout << volk_gnsssdr_get_machine() << std::endl;
   }
+
+  if(vm.count("alignment")) {
+      std::cout << "Alignment in bytes: " << volk_gnsssdr_get_alignment() << std::endl;
+   }
+
+   // You don't want to change the volk_malloc code, so just copy the if/else
+   // structure from there and give an explanation for the implementations
+   if(vm.count("malloc")) {
+     std::cout << "Used malloc implementation: ";
+ #if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600 || HAVE_POSIX_MEMALIGN
+     std::cout << "posix_memalign" << std::endl;
+ #elif _MSC_VER >= 1400
+     std::cout << "aligned_malloc" << std::endl;
+ #else
+     std::cout << "No standard handler available, using own implementation." << std::endl;
+ #endif
+   }
 
   return 0;
 }

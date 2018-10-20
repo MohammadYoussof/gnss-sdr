@@ -127,62 +127,22 @@ private:
     bool read_assistance_from_XML();
 
     // Save {ephemeris, iono, utc, ref loc, ref time} assistance to a local XML file
-    bool save_assistance_to_XML();
+    //bool save_assistance_to_XML();
 
     void read_control_messages();
 
     void process_control_messages();
 
     /*
-     * Blocking function that reads the GPS ephemeris queue and updates the shared ephemeris map, accessible from the PVT block
-     */
-    void gps_ephemeris_data_collector();
-
-    /*
-     * Blocking function that reads the UTC model queue and updates the shared map, accessible from the PVT block
-     */
-    void gps_utc_model_data_collector();
-
-    /*
-     * \brief Blocking function that reads the ref location queue and updates the shared map
-     */
-    void gps_ref_location_data_collector();
-
-    /*
-     * \brief Blocking function that reads the ref time queue and updates the shared map
-     */
-    void gps_ref_time_data_collector();
-
-    /*
-     * Blocking function that reads the iono model queue and updates the shared map, accessible from the PVT block
-     */
-    void gps_iono_data_collector();
-
-    /*
      * Blocking function that reads the GPS assistance queue
      */
     void gps_acq_assist_data_collector();
-
+    
     /*
-     * Blocking function that reads the Galileo ephemeris queue and updates the shared ephemeris map, accessible from the PVT block
+     * Read initial GNSS assistance from SUPL server or local XML files
      */
-    void galileo_ephemeris_data_collector();
-
-    /*
-     * Blocking function that reads the UTC model queue and updates the shared map, accessible from the PVT block
-     */
-    void galileo_utc_model_data_collector();
-
-    /*
-     * Blocking function that reads the iono data queue and updates the shared map, accessible from the PVT block
-     */
-    void galileo_iono_data_collector();
-
-    /*
-     * Blocking function that reads the galileo_almanac queue and updates the shared map, accessible from the PVT block
-     */
-    void galileo_almanac_data_collector();
-
+    void assist_GNSS();
+    
     void apply_action(unsigned int what);
     std::shared_ptr<GNSSFlowgraph> flowgraph_;
     std::shared_ptr<ConfigurationInterface> configuration_;
@@ -194,19 +154,12 @@ private:
     unsigned int processed_control_messages_;
     unsigned int applied_actions_;
     boost::thread keyboard_thread_;
-
-    boost::thread gps_ephemeris_data_collector_thread_;
-    boost::thread gps_iono_data_collector_thread_;
-    boost::thread gps_utc_model_data_collector_thread_;
+    boost::thread sysv_queue_thread_;
     boost::thread gps_acq_assist_data_collector_thread_;
-    boost::thread gps_ref_location_data_collector_thread_;
-    boost::thread gps_ref_time_data_collector_thread_;
-
-    boost::thread galileo_ephemeris_data_collector_thread_;
-    boost::thread galileo_utc_model_data_collector_thread_;
-    boost::thread galileo_iono_data_collector_thread_;
-    boost::thread galileo_almanac_data_collector_thread_;
+    
     void keyboard_listener();
+    void sysv_queue_listener();
+    int msqid;
 
     // default filename for assistance data
     const std::string eph_default_xml_filename = "./gps_ephemeris.xml";

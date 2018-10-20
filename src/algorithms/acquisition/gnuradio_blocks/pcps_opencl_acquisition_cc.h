@@ -10,7 +10,7 @@
  *  <li> Perform the FFT-based circular convolution (parallel time search)
  *  <li> Record the maximum peak and the associated synchronization parameters
  *  <li> Compute the test statistics and compare to the threshold
- *  <li> Declare positive or negative acquisition using a message queue
+ *  <li> Declare positive or negative acquisition using a message port
  *  </ol>
  *
  * Kay Borre book: K.Borre, D.M.Akos, N.Bertelsen, P.Rinder, and S.H.Jensen,
@@ -52,16 +52,11 @@
 #define GNSS_SDR_PCPS_OPENCL_ACQUISITION_CC_H_
 
 #include <fstream>
-#include <queue>
 #include <string>
 #include <vector>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "fft_internal.h"
 #include "gnss_synchro.h"
 
@@ -80,7 +75,7 @@ pcps_make_opencl_acquisition_cc(unsigned int sampled_ms, unsigned int max_dwells
                          unsigned int doppler_max, long freq, long fs_in,
                          int samples_per_ms, int samples_per_code,
                          bool bit_transition_flag,
-                         gr::msg_queue::sptr queue, bool dump,
+                         bool dump,
                          std::string dump_filename);
 
 /*!
@@ -97,14 +92,14 @@ private:
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
             bool bit_transition_flag,
-            gr::msg_queue::sptr queue, bool dump,
+            bool dump,
             std::string dump_filename);
 
     pcps_opencl_acquisition_cc(unsigned int sampled_ms, unsigned int max_dwells,
             unsigned int doppler_max, long freq, long fs_in,
             int samples_per_ms, int samples_per_code,
             bool bit_transition_flag,
-            gr::msg_queue::sptr queue, bool dump,
+            bool dump,
             std::string dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int doppler_shift,
@@ -141,8 +136,6 @@ private:
     float d_input_power;
     float d_test_statistics;
     bool d_bit_transition_flag;
-    gr::msg_queue::sptr d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     std::ofstream d_dump_file;
     bool d_active;
     int d_state;
@@ -217,6 +210,13 @@ public:
      }
 
      /*!
+      * \brief If set to 1, ensures that acquisition starts at the
+      * first available sample.
+      * \param state - int=1 forces start of acquisition
+      */
+     void set_state(int state);
+
+     /*!
       * \brief Set acquisition channel unique ID
       * \param channel - receiver channel.
       */
@@ -251,16 +251,6 @@ public:
      void set_doppler_step(unsigned int doppler_step)
      {
          d_doppler_step = doppler_step;
-     }
-
-
-     /*!
-      * \brief Set tracking channel internal queue.
-      * \param channel_internal_queue - Channel's internal blocks information queue.
-      */
-     void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-     {
-         d_channel_internal_queue = channel_internal_queue;
      }
 
      /*!

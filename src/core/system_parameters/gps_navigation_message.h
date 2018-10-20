@@ -32,21 +32,18 @@
 #ifndef GNSS_SDR_GPS_NAVIGATION_MESSAGE_H_
 #define GNSS_SDR_GPS_NAVIGATION_MESSAGE_H_
 
-#include <algorithm>
+
 #include <bitset>
-#include <cmath>
-#include <iostream>
 #include <map>
 #include <string>
-#include <vector>
 #include <utility>
-#include "boost/assign.hpp"
+#include <vector>
 #include "GPS_L1_CA.h"
 #include "gps_ephemeris.h"
 #include "gps_iono.h"
 #include "gps_almanac.h"
 #include "gps_utc_model.h"
-#include "GPS_L1_CA.h"
+
 
 
 /*!
@@ -150,6 +147,7 @@ public:
     //double d_master_clock;  // GPS transmission time
     double d_satClkCorr;     // GPS clock error
     double d_dtr;            // relativistic clock correction term
+    double d_satClkDrift;
 
     // satellite positions
     double d_satpos_X;       //!< Earth-fixed coordinate x of the satellite [m]. Intersection of the IERS Reference Meridian (IRM) and the plane passing through the origin and normal to the Z-axis.

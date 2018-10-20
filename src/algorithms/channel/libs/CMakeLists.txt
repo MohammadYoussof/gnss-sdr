@@ -16,7 +16,10 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set(CHANNEL_FSM_SOURCES gps_l1_ca_channel_fsm.cc )
+set(CHANNEL_FSM_SOURCES 
+    channel_fsm.cc 
+    channel_msg_receiver_cc.cc
+    )
 
 include_directories(
      $(CMAKE_CURRENT_SOURCE_DIR)
@@ -31,6 +34,10 @@ include_directories(
 )
 
 file(GLOB CHANNEL_FSM_HEADERS "*.h")
+list(SORT CHANNEL_FSM_HEADERS)
 add_library(channel_fsm ${CHANNEL_FSM_SOURCES} ${CHANNEL_FSM_HEADERS})
 source_group(Headers FILES ${CHANNEL_FSM_HEADERS})
 add_dependencies(channel_fsm glog-${glog_RELEASE})
+
+target_link_libraries(channel_fsm gnss_rx)
+

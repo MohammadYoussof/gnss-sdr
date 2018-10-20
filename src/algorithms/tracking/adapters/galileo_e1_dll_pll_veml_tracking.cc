@@ -36,7 +36,6 @@
 
 #include "galileo_e1_dll_pll_veml_tracking.h"
 #include <glog/logging.h>
-#include "GPS_L1_CA.h"
 #include "Galileo_E1.h"
 #include "configuration_interface.h"
 
@@ -45,10 +44,8 @@ using google::LogMessage;
 
 GalileoE1DllPllVemlTracking::GalileoE1DllPllVemlTracking(
         ConfigurationInterface* configuration, std::string role,
-        unsigned int in_streams, unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
-        role_(role), in_streams_(in_streams), out_streams_(out_streams),
-        queue_(queue)
+        unsigned int in_streams, unsigned int out_streams) :
+        role_(role), in_streams_(in_streams), out_streams_(out_streams)
 {
     DLOG(INFO) << "role " << role;
     //################# CONFIGURATION PARAMETERS ########################
@@ -64,7 +61,7 @@ GalileoE1DllPllVemlTracking::GalileoE1DllPllVemlTracking(
     float early_late_space_chips;
     float very_early_late_space_chips;
 
-    item_type = configuration->property(role + ".item_type",default_item_type);
+    item_type = configuration->property(role + ".item_type", default_item_type);
     fs_in = configuration->property("GNSS-SDR.internal_fs_hz", 2048000);
     f_if = configuration->property(role + ".if", 0);
     dump = configuration->property(role + ".dump", false);
@@ -86,7 +83,6 @@ GalileoE1DllPllVemlTracking::GalileoE1DllPllVemlTracking(
                     f_if,
                     fs_in,
                     vector_length,
-                    queue_,
                     dump,
                     dump_filename,
                     pll_bw_hz,
@@ -96,8 +92,11 @@ GalileoE1DllPllVemlTracking::GalileoE1DllPllVemlTracking(
         }
     else
         {
+            item_size_ = sizeof(gr_complex);
             LOG(WARNING) << item_type << " unknown tracking item type.";
         }
+
+    channel_ = 0;
 
     DLOG(INFO) << "tracking(" << tracking_->unique_id() << ")";
 }
@@ -119,17 +118,6 @@ void GalileoE1DllPllVemlTracking::set_channel(unsigned int channel)
     tracking_->set_channel(channel);
 }
 
-/*
- * Set tracking channel internal queue
- */
-void GalileoE1DllPllVemlTracking::set_channel_queue(
-        concurrent_queue<int> *channel_internal_queue)
-{
-    channel_internal_queue_ = channel_internal_queue;
-
-    tracking_->set_channel_queue(channel_internal_queue_);
-
-}
 
 void GalileoE1DllPllVemlTracking::set_gnss_synchro(Gnss_Synchro* p_gnss_synchro)
 {
@@ -138,11 +126,13 @@ void GalileoE1DllPllVemlTracking::set_gnss_synchro(Gnss_Synchro* p_gnss_synchro)
 
 void GalileoE1DllPllVemlTracking::connect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     //nothing to connect, now the tracking uses gr_sync_decimator
 }
 
 void GalileoE1DllPllVemlTracking::disconnect(gr::top_block_sptr top_block)
 {
+    if(top_block) { /* top_block is not null */};
     //nothing to disconnect, now the tracking uses gr_sync_decimator
 }
 

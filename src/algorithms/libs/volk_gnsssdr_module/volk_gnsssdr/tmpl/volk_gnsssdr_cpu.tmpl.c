@@ -19,6 +19,7 @@
 #include <volk_gnsssdr/volk_gnsssdr_cpu.h>
 #include <volk_gnsssdr/volk_gnsssdr_config_fixed.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct VOLK_CPU volk_gnsssdr_cpu;
 
@@ -30,12 +31,9 @@ struct VOLK_CPU volk_gnsssdr_cpu;
 
 //implement get cpuid for gcc compilers using a system or local copy of cpuid.h
 #if defined(__GNUC__)
-    #if defined(HAVE_CPUID_H)
-        #include <cpuid.h>
-    #else
-        #include "gcc_x86_cpuid.h"
-    #endif
+    #include <cpuid.h>
     #define cpuid_x86(op, r) __get_cpuid(op, (unsigned int *)r+0, (unsigned int *)r+1, (unsigned int *)r+2, (unsigned int *)r+3)
+    #define cpuid_x86_count(op, count, regs) __cpuid_count(op, count, *((unsigned int*)regs), *((unsigned int*)regs+1), *((unsigned int*)regs+2), *((unsigned int*)regs+3))
 
     /* Return Intel AVX extended CPU capabilities register.
      * This function will bomb on non-AVX-capable machines, so
@@ -69,9 +67,20 @@ struct VOLK_CPU volk_gnsssdr_cpu;
 
 #endif //defined(VOLK_CPU_x86)
 
+static inline unsigned int cpuid_count_x86_bit(unsigned int level, unsigned int count, unsigned int reg, unsigned int bit) {
+#if defined(VOLK_CPU_x86)
+    unsigned int regs[4] = {0};
+    cpuid_x86_count(level, count, regs);
+    return regs[reg] >> bit & 0x01;
+#else
+    return 0;
+#endif
+}
+
 static inline unsigned int cpuid_x86_bit(unsigned int reg, unsigned int op, unsigned int bit) {
 #if defined(VOLK_CPU_x86)
     unsigned int regs[4];
+    memset(regs, 0, sizeof(unsigned int)*4);
     cpuid_x86(op, regs);
     return regs[reg] >> bit & 0x01;
 #else
@@ -82,6 +91,7 @@ static inline unsigned int cpuid_x86_bit(unsigned int reg, unsigned int op, unsi
 static inline unsigned int check_extended_cpuid(unsigned int val) {
 #if defined(VOLK_CPU_x86)
     unsigned int regs[4];
+    memset(regs, 0, sizeof(unsigned int)*4);
     cpuid_x86(0x80000000, regs);
     return regs[0] >= val;
 #else
@@ -90,6 +100,14 @@ static inline unsigned int check_extended_cpuid(unsigned int val) {
 }
 
 static inline unsigned int get_avx_enabled(void) {
+#if defined(VOLK_CPU_x86)
+    return __xgetbv() & 0x6;
+#else
+    return 0;
+#endif
+}
+
+static inline unsigned int get_avx2_enabled(void) {
 #if defined(VOLK_CPU_x86)
     return __xgetbv() & 0x6;
 #else
@@ -129,23 +147,14 @@ static int has_neon(void){
 #endif
 }
 
-static int has_ppc(void){
-#ifdef __PPC__
-    return 1;
-#else
-    return 0;
-#endif
-}
-
-#for $arch in $archs
-static int i_can_has_$arch.name (void) {
-    #for $check, $params in $arch.checks
-    if ($(check)($(', '.join($params))) == 0) return 0;
-    #end for
+%for arch in archs:
+static int i_can_has_${arch.name} (void) {
+    %for check, params in arch.checks:
+    if (${check}(<% joined_params = ', '.join(params)%>${joined_params}) == 0) return 0;
+    %endfor
     return 1;
 }
-
-#end for
+%endfor
 
 #if defined(HAVE_FENV_H)
     #if defined(FE_TONEAREST)
@@ -172,17 +181,17 @@ static int i_can_has_$arch.name (void) {
 #endif
 
 void volk_gnsssdr_cpu_init() {
-    #for $arch in $archs
-    volk_gnsssdr_cpu.has_$arch.name = &i_can_has_$arch.name;
-    #end for
+    %for arch in archs:
+    volk_gnsssdr_cpu.has_${arch.name} = &i_can_has_${arch.name};
+    %endfor
     set_float_rounding();
 }
 
 unsigned int volk_gnsssdr_get_lvarch() {
     unsigned int retval = 0;
     volk_gnsssdr_cpu_init();
-    #for $arch in $archs
-    retval += volk_gnsssdr_cpu.has_$(arch.name)() << LV_$(arch.name.upper());
-    #end for
+    %for arch in archs:
+    retval += volk_gnsssdr_cpu.has_${arch.name}() << LV_${arch.name.upper()};
+    %endfor
     return retval;
 }

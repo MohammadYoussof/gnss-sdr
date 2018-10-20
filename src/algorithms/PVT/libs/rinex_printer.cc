@@ -33,7 +33,9 @@
 #include <algorithm> // for min and max
 #include <cmath>     // for floor
 #include <cstdlib>   // for getenv()
+#include <iterator>
 #include <ostream>
+#include <set>
 #include <utility>
 #include <vector>
 #include <boost/date_time/time_zone_base.hpp>
@@ -49,7 +51,7 @@ using google::LogMessage;
 DEFINE_string(RINEX_version, "3.02", "Specifies the RINEX version (2.11 or 3.02)");
 
 
-Rinex_Printer::Rinex_Printer()
+Rinex_Printer::Rinex_Printer(int conf_version)
 {
     navfilename = Rinex_Printer::createFilename("RINEX_FILE_TYPE_GPS_NAV");
     obsfilename = Rinex_Printer::createFilename("RINEX_FILE_TYPE_OBS");
@@ -57,11 +59,11 @@ Rinex_Printer::Rinex_Printer()
     navGalfilename = Rinex_Printer::createFilename("RINEX_FILE_TYPE_GAL_NAV");
     navMixfilename = Rinex_Printer::createFilename("RINEX_FILE_TYPE_MIXED_NAV");
 
-    Rinex_Printer::navFile.open(navfilename, std::ios::out | std::ios::app);
-    Rinex_Printer::obsFile.open(obsfilename, std::ios::out | std::ios::app);
+    Rinex_Printer::navFile.open(navfilename, std::ios::out | std::ios::in | std::ios::app);
+    Rinex_Printer::obsFile.open(obsfilename, std::ios::out | std::ios::in | std::ios::app);
     Rinex_Printer::sbsFile.open(sbsfilename, std::ios::out | std::ios::app);
-    Rinex_Printer::navGalFile.open(navGalfilename, std::ios::out | std::ios::app);
-    Rinex_Printer::navMixFile.open(navMixfilename, std::ios::out | std::ios::app);
+    Rinex_Printer::navGalFile.open(navGalfilename, std::ios::out | std::ios::in | std::ios::app);
+    Rinex_Printer::navMixFile.open(navMixfilename, std::ios::out | std::ios::in | std::ios::app);
 
     // RINEX v3.02 codes
     satelliteSystem["GPS"] = "G";
@@ -101,7 +103,7 @@ Rinex_Printer::Rinex_Printer()
     observationCode["GALILEO_E1_ABC"] = "1Z";         // "1Z" GALILEO E1 A+B+C
     observationCode["GALILEO_E5a_I"] = "5I";          // "5I" GALILEO E5a I (F/NAV OS)
     observationCode["GALILEO_E5a_Q"] = "5Q";          // "5Q" GALILEO E5a Q  (no data)
-    observationCode["GALILEO_E5aIQ"] = "5X";          // "5X" GALILEO E5a I+Q
+    observationCode["GALILEO_E5a_IQ"] = "5X";          // "5X" GALILEO E5a I+Q
     observationCode["GALILEO_E5b_I"] = "7I";          // "7I" GALILEO E5b I
     observationCode["GALILEO_E5b_Q"] = "7Q";          // "7Q" GALILEO E5b Q
     observationCode["GALILEO_E5b_IQ"] = "7X";         // "7X" GALILEO E5b I+Q
@@ -172,12 +174,20 @@ Rinex_Printer::Rinex_Printer()
         }
     else
         {
-            LOG(ERROR) << "Unknown RINEX version " << FLAGS_RINEX_version << " (must be 2.11 or 3.02)" << std::endl;
+            LOG(WARNING) << "Unknown RINEX version " << FLAGS_RINEX_version << " (must be 2.11 or 3.02). Using 3.02";
+            version = 3;
+            stringVersion = "3.02";
         }
+
+    if(conf_version != 0)
+    {
+        if(conf_version == 2)
+        version = 2;
+        stringVersion = "2.11";
+    }
 
     numberTypesObservations = 4; // Number of available types of observable in the system
 }
-
 
 
 Rinex_Printer::~Rinex_Printer()
@@ -196,27 +206,25 @@ Rinex_Printer::~Rinex_Printer()
     // If nothing written, erase the files.
     if (posn == 0)
         {
-            remove(navfilename.c_str());
+            if(remove(navfilename.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
         }
     if (poso == 0)
         {
-            remove(obsfilename.c_str());
+            if(remove(obsfilename.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
         }
     if (poss == 0)
         {
-            remove(sbsfilename.c_str());
+            if(remove(sbsfilename.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
         }
     if (posng == 0)
         {
-            remove(navGalfilename.c_str());
+            if(remove(navGalfilename.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
         }
     if (posmn == 0)
         {
-            remove(navMixfilename.c_str());
+            if(remove(navMixfilename.c_str()) != 0) LOG(INFO) << "Error deleting temporary file";
         }
 }
-
-
 
 
 void Rinex_Printer::lengthCheck(const std::string& line)
@@ -229,7 +237,6 @@ void Rinex_Printer::lengthCheck(const std::string& line)
                     << "----|---1|0---|---2|0---|---3|0---|---4|0---|---5|0---|---6|0---|---7|0---|---8|" << std::endl;
         }
 }
-
 
 
 std::string Rinex_Printer::createFilename(std::string type)
@@ -391,7 +398,7 @@ std::string Rinex_Printer::getLocalTime()
 }
 
 
-void Rinex_Printer::rinex_nav_header(std::ofstream& out, const Galileo_Iono& iono, const Galileo_Utc_Model& utc_model, const Galileo_Almanac& galileo_almanac)
+void Rinex_Printer::rinex_nav_header(std::fstream& out, const Galileo_Iono& iono, const Galileo_Utc_Model& utc_model, const Galileo_Almanac& galileo_almanac)
 {
     std::string line;
     stringVersion = "3.02";
@@ -501,9 +508,125 @@ void Rinex_Printer::rinex_nav_header(std::ofstream& out, const Galileo_Iono& ion
     out << line << std::endl;
 }
 
-void Rinex_Printer::rinex_nav_header(std::ofstream& out, const Gps_Iono& iono, const Gps_Utc_Model& utc_model)
-{
 
+void Rinex_Printer::rinex_nav_header(std::fstream& out, const Gps_CNAV_Iono & iono, const Gps_CNAV_Utc_Model & utc_model)
+{
+    std::string line;
+
+    // -------- Line 1
+    line = std::string(5, ' ');
+    line += stringVersion;
+    line += std::string(11, ' ');
+    line += std::string("N: GNSS NAV DATA");
+    line += std::string(4, ' ');
+    line += std::string("G: GPS");
+    line += std::string(14, ' ');
+    line += std::string("RINEX VERSION / TYPE");
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 2
+    line.clear();
+    line += Rinex_Printer::getLocalTime();
+    line += std::string("PGM / RUN BY / DATE");
+    line += std::string(1, ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 3
+    line.clear();
+    line += Rinex_Printer::leftJustify("GPS NAVIGATION MESSAGE FILE GENERATED BY GNSS-SDR", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    std::string gnss_sdr_version(GNSS_SDR_VERSION);
+    line += "GNSS-SDR VERSION ";
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 43);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("See http://gnss-sdr.org", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line ionospheric info 1
+    line.clear();
+    line += std::string("GPSA");
+    line += std::string(1, ' ');
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha0, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha1, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha2, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha3, 10, 2), 12);
+    line += std::string(7, ' ');
+    line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line ionospheric info 2
+    line.clear();
+    line += std::string("GPSB");
+    line += std::string(1, ' ');
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta0, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta1, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta2, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta3, 10, 2), 12);
+    line += std::string(7, ' ');
+    line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 5 system time correction
+    line.clear();
+    line += std::string("GPUT");
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A0, 16, 2), 18);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A1, 15, 2), 16);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_t_OT), 7);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_T + 1024), 5);  // valid until 2019
+    /*  if ( SBAS )
+    {
+      line += string(1, ' ');
+      line += leftJustify(asString(d_t_OT_SBAS),5);
+      line += string(1, ' ');
+      line += leftJustify(asString(d_WN_T_SBAS),2);
+      line += string(1, ' ');
+           }
+    else
+     */
+    line += std::string(10, ' ');
+    line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 6 leap seconds
+    // For leap second information, see http://www.endruntechnologies.com/leap.htm
+    line.clear();
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LSF), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_LSF), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_DN), 6);
+    line += std::string(36, ' ');
+    line += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- End of Header
+    line.clear();
+    line += std::string(60, ' ');
+    line += Rinex_Printer::leftJustify("END OF HEADER", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+}
+
+
+void Rinex_Printer::rinex_nav_header(std::fstream& out, const Gps_Iono& iono, const Gps_Utc_Model& utc_model)
+{
     std::string line;
 
     // -------- Line 1
@@ -680,141 +803,143 @@ void Rinex_Printer::rinex_nav_header(std::ofstream& out, const Gps_Iono& iono, c
     out << line << std::endl;
 }
 
-void Rinex_Printer::rinex_nav_header(std::ofstream& out, const Gps_Iono& gps_iono, const Gps_Utc_Model& gps_utc_model, const Galileo_Iono& galileo_iono, const Galileo_Utc_Model& galileo_utc_model, const Galileo_Almanac& galileo_almanac)
+
+void Rinex_Printer::rinex_nav_header(std::fstream& out, const Gps_Iono& gps_iono, const Gps_Utc_Model& gps_utc_model, const Galileo_Iono& galileo_iono, const Galileo_Utc_Model& galileo_utc_model, const Galileo_Almanac& galileo_almanac)
 {
     std::string line;
-        stringVersion = "3.02";
-        version = 3;
+    stringVersion = "3.02";
+    version = 3;
 
-        // -------- Line 1
-        line = std::string(5, ' ');
-        line += stringVersion;
-        line += std::string(11, ' ');
-        line += std::string("N: GNSS NAV DATA");
-        line += std::string(4, ' ');
-        line += std::string("M: MIXED");
-        line += std::string(12, ' ');
-        line += std::string("RINEX VERSION / TYPE");
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line 1
+    line = std::string(5, ' ');
+    line += stringVersion;
+    line += std::string(11, ' ');
+    line += std::string("N: GNSS NAV DATA");
+    line += std::string(4, ' ');
+    line += std::string("M: MIXED");
+    line += std::string(12, ' ');
+    line += std::string("RINEX VERSION / TYPE");
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
-        // -------- Line 2
-        line.clear();
-        line += Rinex_Printer::getLocalTime();
-        line += std::string("PGM / RUN BY / DATE");
-        line += std::string(1, ' ');
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line 2
+    line.clear();
+    line += Rinex_Printer::getLocalTime();
+    line += std::string("PGM / RUN BY / DATE");
+    line += std::string(1, ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
-        // -------- Line COMMENT
-        line.clear();
-        line += Rinex_Printer::leftJustify("GNSS NAVIGATION MESSAGE FILE GENERATED BY GNSS-SDR", 60);
-        line += Rinex_Printer::leftJustify("COMMENT", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("GNSS NAVIGATION MESSAGE FILE GENERATED BY GNSS-SDR", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
-        // -------- Line COMMENT
-        line.clear();
-        std::string gnss_sdr_version(GNSS_SDR_VERSION);
-        line += "GNSS-SDR VERSION ";
-        line += Rinex_Printer::leftJustify(gnss_sdr_version, 43);
-        line += Rinex_Printer::leftJustify("COMMENT", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line COMMENT
+    line.clear();
+    std::string gnss_sdr_version(GNSS_SDR_VERSION);
+    line += "GNSS-SDR VERSION ";
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 43);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
-        // -------- Line COMMENT
-        line.clear();
-        line += Rinex_Printer::leftJustify("See http://gnss-sdr.org", 60);
-        line += Rinex_Printer::leftJustify("COMMENT", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
-
-
-        // -------- Line ionospheric info 1
-        line.clear();
-        line += std::string("GAL ");
-        line += std::string(1, ' ');
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai0_5, 10, 2), 12);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai1_5, 10, 2), 12);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai2_5, 10, 2), 12);
-        double zero = 0.0;
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(zero, 10, 2), 12);
-        line += std::string(7, ' ');
-        line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
-
-        // -------- Line ionospheric info 2
-        line.clear();
-        line += std::string("GPSA");
-        line += std::string(1, ' ');
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha0, 10, 2), 12);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha1, 10, 2), 12);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha2, 10, 2), 12);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha3, 10, 2), 12);
-        line += std::string(7, ' ');
-        line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
-
-        // -------- Line system time correction
-        line.clear();
-        line += std::string("GAUT");
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A0_6, 16, 2), 18);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A1_6, 15, 2), 16);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.t0t_6), 7);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.WNot_6), 5);
-        line += std::string(10, ' ');
-        line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
-
-        // -------- Line system time correction 2
-        line.clear();
-        line += std::string("GPGA");
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_0G_10, 16, 2), 18);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_1G_10, 15, 2), 16);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.t_0G_10), 7);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.WN_0G_10), 5);
-        line += std::string(10, ' ');
-        line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
-
-        // -------- Line system time correction 3
-        line.clear();
-        line += std::string("GPUT");
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A0, 16, 2), 18);
-        line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A1, 15, 2), 16);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_t_OT), 7);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_T + 1024), 5);  // valid until 2019
-        line += std::string(10, ' ');
-        line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("See http://gnss-sdr.org", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
 
-        // -------- Line 6 leap seconds
-        // For leap second information, see http://www.endruntechnologies.com/leap.htm
-        line.clear();
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LS), 6);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LSF), 6);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_LSF), 6);
-        line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_DN), 6);
-        line += std::string(36, ' ');
-        line += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line ionospheric info 1
+    line.clear();
+    line += std::string("GAL ");
+    line += std::string(1, ' ');
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai0_5, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai1_5, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai2_5, 10, 2), 12);
+    double zero = 0.0;
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(zero, 10, 2), 12);
+    line += std::string(7, ' ');
+    line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 
-        // -------- End of Header
-        line.clear();
-        line += std::string(60, ' ');
-        line += Rinex_Printer::leftJustify("END OF HEADER", 20);
-        Rinex_Printer::lengthCheck(line);
-        out << line << std::endl;
+    // -------- Line ionospheric info 2
+    line.clear();
+    line += std::string("GPSA");
+    line += std::string(1, ' ');
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha0, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha1, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha2, 10, 2), 12);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha3, 10, 2), 12);
+    line += std::string(7, ' ');
+    line += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line system time correction
+    line.clear();
+    line += std::string("GAUT");
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A0_6, 16, 2), 18);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A1_6, 15, 2), 16);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.t0t_6), 7);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.WNot_6), 5);
+    line += std::string(10, ' ');
+    line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line system time correction 2
+    line.clear();
+    line += std::string("GPGA");
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_0G_10, 16, 2), 18);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_1G_10, 15, 2), 16);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.t_0G_10), 7);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.WN_0G_10), 5);
+    line += std::string(10, ' ');
+    line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line system time correction 3
+    line.clear();
+    line += std::string("GPUT");
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A0, 16, 2), 18);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A1, 15, 2), 16);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_t_OT), 7);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_T + 1024), 5);  // valid until 2019
+    line += std::string(10, ' ');
+    line += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+
+    // -------- Line 6 leap seconds
+    // For leap second information, see http://www.endruntechnologies.com/leap.htm
+    line.clear();
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LS), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LSF), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_LSF), 6);
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_DN), 6);
+    line += std::string(36, ' ');
+    line += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- End of Header
+    line.clear();
+    line += std::string(60, ' ');
+    line += Rinex_Printer::leftJustify("END OF HEADER", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
 }
 
-void Rinex_Printer::rinex_sbs_header(std::ofstream& out)
+
+void Rinex_Printer::rinex_sbs_header(std::fstream& out)
 {
     std::string line;
 
@@ -922,17 +1047,490 @@ void Rinex_Printer::rinex_sbs_header(std::ofstream& out)
 }
 
 
-void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int,Gps_Ephemeris>& eph_map)
+void Rinex_Printer::update_nav_header(std::fstream& out, const Galileo_Iono& galileo_iono, const Galileo_Utc_Model& utc_model, const Galileo_Almanac& galileo_almanac)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    long pos = out.tellp();
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if ((line_str.find("GAL", 0) != std::string::npos) && (line_str.find("IONOSPHERIC CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GAL ");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai0_5, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai1_5, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai2_5, 10, 2), 12);
+                            double zero = 0.0;
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(zero, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GAUT", 0) != std::string::npos) && (line_str.find("TIME SYSTEM CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GAUT");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.A0_6, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.A1_6, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.t0t_6), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.WNot_6), 5);
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GPGA", 0) != std::string::npos) && (line_str.find("TIME SYSTEM CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GPGA");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_0G_10, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_1G_10, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.t_0G_10), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.WN_0G_10), 5);
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("LEAP SECONDS", 59) != std::string::npos)
+                        {
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.Delta_tLS_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.Delta_tLSF_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.WN_LSF_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.DN_6), 6);
+                            line_aux += std::string(36, ' ');
+                            line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            no_more_finds = true;
+                        }
+                    else
+                        {
+                            data.push_back(line_str);
+                        }
+
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(navGalfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(navGalfilename, std::ios::out | std::ios::app);
+    out.seekp(pos);
+    std::cout << "The RINEX Navigation file header has been updated with UTC and IONO info." << std::endl;
+}
+
+
+void Rinex_Printer::update_nav_header(std::fstream& out, const Gps_Utc_Model& utc_model, const Gps_Iono& iono)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    long pos = out.tellp();
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if (version == 2)
+                        {
+                            if (line_str.find("ION ALPHA", 59) != std::string::npos)
+                                {
+                                    line_aux += std::string(2, ' ');
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha0, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha1, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha2, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha3, 10, 2), 12);
+                                    line_aux += std::string(10, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("ION ALPHA", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("ION BETA", 59) != std::string::npos)
+                                {
+                                    line_aux += std::string(2, ' ');
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta0, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta1, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta2, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta3, 10, 2), 12);
+                                    line_aux += std::string(10, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("ION BETA", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("DELTA-UTC", 59) != std::string::npos)
+                                {
+                                    line_aux += std::string(3, ' ');
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A0, 18, 2), 19);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A1, 18, 2), 19);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_t_OT), 9);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_T + 1024), 9); // valid until 2019
+                                    line_aux += std::string(1, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("DELTA-UTC: A0,A1,T,W", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("LEAP SECONDS", 59) != std::string::npos)
+                                {
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                                    line_aux += std::string(54, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                                {
+                                    data.push_back(line_str);
+                                    no_more_finds = true;
+                                }
+                            else
+                                {
+                                    data.push_back(line_str);
+                                }
+                        }
+
+                    if (version == 3)
+                        {
+                            if (line_str.find("GPSA", 0) != std::string::npos)
+                                {
+                                    line_aux += std::string("GPSA");
+                                    line_aux += std::string(1, ' ');
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha0, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha1, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha2, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha3, 10, 2), 12);
+                                    line_aux += std::string(7, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("GPSB", 0) != std::string::npos)
+                                {
+                                    line_aux += std::string("GPSB");
+                                    line_aux += std::string(1, ' ');
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta0, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta1, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta2, 10, 2), 12);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta3, 10, 2), 12);
+                                    line_aux += std::string(7, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("GPUT", 0) != std::string::npos)
+                                {
+                                    line_aux += std::string("GPUT");
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A0, 16, 2), 18);
+                                    line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A1, 15, 2), 16);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_t_OT), 7);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_T + 1024), 5);  // valid until 2019
+                                    line_aux += std::string(10, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("LEAP SECONDS", 59) != std::string::npos)
+                                {
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LSF), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_LSF), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_DN), 6);
+                                    line_aux += std::string(36, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                                {
+                                    data.push_back(line_str);
+                                    no_more_finds = true;
+                                }
+                            else
+                                {
+                                    data.push_back(line_str);
+                                }
+                        }
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(navfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(navfilename, std::ios::out | std::ios::app);
+    out.seekp(pos);
+    std::cout << "The RINEX Navigation file header has been updated with UTC and IONO info." << std::endl;
+}
+
+
+void Rinex_Printer::update_nav_header(std::fstream & out, const Gps_CNAV_Utc_Model & utc_model, const Gps_CNAV_Iono & iono )
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    long pos = out.tellp();
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if (line_str.find("GPSA", 0) != std::string::npos)
+                        {
+                            line_aux += std::string("GPSA");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha0, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha1, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha2, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_alpha3, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("GPSB", 0) != std::string::npos)
+                        {
+                            line_aux += std::string("GPSB");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta0, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta1, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta2, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(iono.d_beta3, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("GPUT", 0) != std::string::npos)
+                        {
+                            line_aux += std::string("GPUT");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A0, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(utc_model.d_A1, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_t_OT), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_T + 1024), 5);  // valid until 2019
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("LEAP SECONDS", 59) != std::string::npos)
+                        {
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_DN), 6);
+                            line_aux += std::string(36, ' ');
+                            line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            no_more_finds = true;
+                        }
+                    else
+                        {
+                            data.push_back(line_str);
+                        }
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(navfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(navfilename, std::ios::out | std::ios::app);
+    out.seekp(pos);
+    std::cout << "The RINEX Navigation file header has been updated with UTC and IONO info." << std::endl;
+}
+
+
+void Rinex_Printer::update_nav_header(std::fstream& out, const Gps_Iono& gps_iono, const Gps_Utc_Model& gps_utc_model, const Galileo_Iono& galileo_iono, const Galileo_Utc_Model& galileo_utc_model, const Galileo_Almanac& galileo_almanac)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    long pos = out.tellp();
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if (line_str.find("GPSA", 0) != std::string::npos)
+                        {
+                            line_aux += std::string("GPSA");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha0, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha1, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha2, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_alpha3, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GAL", 0) != std::string::npos) && (line_str.find("IONOSPHERIC CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GAL ");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai0_5, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai1_5, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_iono.ai2_5, 10, 2), 12);
+                            double zero = 0.0;
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(zero, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GPSB", 0) != std::string::npos) && (line_str.find("IONOSPHERIC CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GPSB");
+                            line_aux += std::string(1, ' ');
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_beta0, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_beta1, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_beta2, 10, 2), 12);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_iono.d_beta3, 10, 2), 12);
+                            line_aux += std::string(7, ' ');
+                            line_aux += Rinex_Printer::leftJustify("IONOSPHERIC CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GPUT", 0) != std::string::npos) && (line_str.find("TIME SYSTEM CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GPUT");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A0, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(gps_utc_model.d_A1, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_t_OT), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_T + 1024), 5);  // valid until 2019
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GAUT", 0) != std::string::npos) && (line_str.find("TIME SYSTEM CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GAUT");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A0_6, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_utc_model.A1_6, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.t0t_6), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.WNot_6), 5);
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if ((line_str.find("GPGA", 0) != std::string::npos) && (line_str.find("TIME SYSTEM CORR", 59) != std::string::npos))
+                        {
+                            line_aux += std::string("GPGA");
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_0G_10, 16, 2), 18);
+                            line_aux += Rinex_Printer::rightJustify(Rinex_Printer::doub2for(galileo_almanac.A_1G_10, 15, 2), 16);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.t_0G_10), 7);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_almanac.WN_0G_10), 5);
+                            line_aux += std::string(10, ' ');
+                            line_aux += Rinex_Printer::leftJustify("TIME SYSTEM CORR", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("LEAP SECONDS", 59) != std::string::npos)
+                        {
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LS), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.d_DeltaT_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_WN_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(gps_utc_model.i_DN), 6);
+                            line_aux += std::string(36, ' ');
+                            line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            no_more_finds = true;
+                        }
+                    else
+                        {
+                            data.push_back(line_str);
+                        }
+
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(navMixfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(navMixfilename, std::ios::out | std::ios::app);
+    out.seekp(pos);
+    std::cout << "The RINEX Navigation file header has been updated with UTC and IONO info." << std::endl;
+}
+
+
+void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int,Gps_Ephemeris>& eph_map)
 {
     std::string line;
     std::map<int,Gps_Ephemeris>::const_iterator gps_ephemeris_iter;
 
     for(gps_ephemeris_iter = eph_map.begin();
-    		gps_ephemeris_iter != eph_map.end();
-    		gps_ephemeris_iter++)
+            gps_ephemeris_iter != eph_map.end();
+            gps_ephemeris_iter++)
     {
             // -------- SV / EPOCH / SV CLK
-            boost::posix_time::ptime p_utc_time = Rinex_Printer::compute_GPS_time(gps_ephemeris_iter->second,gps_ephemeris_iter->second.d_TOW);
+            boost::posix_time::ptime p_utc_time = Rinex_Printer::compute_GPS_time(gps_ephemeris_iter->second, gps_ephemeris_iter->second.d_Toc);
             std::string timestring = boost::posix_time::to_iso_string(p_utc_time);
             std::string month (timestring, 4, 2);
             std::string day (timestring, 6, 2);
@@ -946,15 +1544,55 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int,Gps_Eph
                     std::string year (timestring, 2, 2);
                     line += year;
                     line += std::string(1, ' ');
-                    line += month;
+                    if(boost::lexical_cast<int>(month) < 10)
+                        {
+                            line += std::string(1, ' ');
+                            line += std::string(month, 1, 1);
+                        }
+                    else
+                        {
+                            line += month;
+                        }
                     line += std::string(1, ' ');
-                    line += day;
+                    if(boost::lexical_cast<int>(day) < 10)
+                        {
+                            line += std::string(1, ' ');
+                            line += std::string(day, 1, 1);
+                        }
+                    else
+                        {
+                            line += day;
+                        }
                     line += std::string(1, ' ');
-                    line += hour;
+                    if(boost::lexical_cast<int>(hour) < 10)
+                        {
+                            line += std::string(1, ' ');
+                            line += std::string(hour, 1, 1);
+                        }
+                    else
+                        {
+                            line += hour;
+                        }
                     line += std::string(1, ' ');
-                    line += minutes;
+                    if(boost::lexical_cast<int>(minutes) < 10)
+                        {
+                            line += std::string(1, ' ');
+                            line += std::string(minutes, 1, 1);
+                        }
+                    else
+                        {
+                            line += minutes;
+                        }
                     line += std::string(1, ' ');
-                    line += seconds;
+                    if(boost::lexical_cast<int>(seconds) < 10)
+                        {
+                            line += std::string(1, ' ');
+                            line += std::string(seconds, 1, 1);
+                        }
+                    else
+                        {
+                            line += seconds;
+                        }
                     line += std::string(1, '.');
                     std::string decimal = std::string("0");
                     if (timestring.size() > 16)
@@ -1010,18 +1648,15 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int,Gps_Eph
                 {
                     line += std::string(5, ' ');
                 }
-            // IODE is not present in ephemeris data
             // If there is a discontinued reception the ephemeris is not validated
-            //if (gps_ephemeris_iter->second.d_IODE_SF2 == gps_ephemeris_iter->second.d_IODE_SF3)
-            //    {
-            //        line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_IODE_SF2, 18, 2);
-            //    }
-            //else
-            //    {
-            //        LOG(ERROR) << "Discontinued reception of Frame 2 and 3 " << std::endl;
-            //    }
-            double d_IODE_SF2 = 0;
-            line += Rinex_Printer::doub2for(d_IODE_SF2, 18, 2);
+            if (gps_ephemeris_iter->second.d_IODE_SF2 == gps_ephemeris_iter->second.d_IODE_SF3)
+                {
+                    line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_IODE_SF2, 18, 2);
+                }
+            else
+                {
+                    LOG(WARNING) << "Discontinued reception of Frame 2 and 3";
+                }
             line += std::string(1, ' ');
             line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Crs, 18, 2);
             line += std::string(1, ' ');
@@ -1085,7 +1720,6 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int,Gps_Eph
                 }
             Rinex_Printer::lengthCheck(line);
             out << line << std::endl;
-
 
 
 
@@ -1217,7 +1851,161 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int,Gps_Eph
 }
 
 
-void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int, Galileo_Ephemeris>& eph_map)
+void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int,Gps_CNAV_Ephemeris>& eph_map)
+{
+    std::string line;
+    std::map<int,Gps_CNAV_Ephemeris>::const_iterator gps_ephemeris_iter;
+
+    for(gps_ephemeris_iter = eph_map.begin();
+            gps_ephemeris_iter != eph_map.end();
+            gps_ephemeris_iter++)
+        {
+            // -------- SV / EPOCH / SV CLK
+            boost::posix_time::ptime p_utc_time = Rinex_Printer::compute_GPS_time(gps_ephemeris_iter->second, gps_ephemeris_iter->second.d_Toc);
+            std::string timestring = boost::posix_time::to_iso_string(p_utc_time);
+            std::string month (timestring, 4, 2);
+            std::string day (timestring, 6, 2);
+            std::string hour (timestring, 9, 2);
+            std::string minutes (timestring, 11, 2);
+            std::string seconds (timestring, 13, 2);
+            line += satelliteSystem["GPS"];
+            if (gps_ephemeris_iter->second.i_satellite_PRN < 10)  line += std::string("0");
+            line += boost::lexical_cast<std::string>(gps_ephemeris_iter->second.i_satellite_PRN);
+            std::string year (timestring, 0, 4);
+            line += std::string(1, ' ');
+            line += year;
+            line += std::string(1, ' ');
+            line += month;
+            line += std::string(1, ' ');
+            line += day;
+            line += std::string(1, ' ');
+            line += hour;
+            line += std::string(1, ' ');
+            line += minutes;
+            line += std::string(1, ' ');
+            line += seconds;
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_A_f0, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_A_f1, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_A_f2, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 1
+            line.clear();
+            line += std::string(5, ' ');
+            // If there is no IODE in CNAV, so we set it to zero
+            double my_zero = 0.0;
+            line += Rinex_Printer::doub2for(my_zero, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Crs, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Delta_n, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_M_0, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 2
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Cuc, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_e_eccentricity, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Cus, 18, 2);
+            line += std::string(1, ' ');
+            const double A_REF = 26559710.0; // See IS-GPS-200H,  pp. 163
+            double sqrt_A = sqrt(A_REF + gps_ephemeris_iter->second.d_DELTA_A);
+            line += Rinex_Printer::doub2for(sqrt_A, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 3
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(std::max(gps_ephemeris_iter->second.d_Toe1, gps_ephemeris_iter->second.d_Toe2), 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Cic, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_OMEGA0, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Cis, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 4
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_i_0, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_Crc, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_OMEGA, 18, 2);
+            line += std::string(1, ' ');
+            const double OMEGA_DOT_REF = -2.6e-9; // semicircles / s, see IS-GPS-200H pp. 164
+            double OMEGA_DOT = OMEGA_DOT_REF + gps_ephemeris_iter->second.d_DELTA_OMEGA_DOT;
+            line += Rinex_Printer::doub2for(OMEGA_DOT, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 5
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_IDOT, 18, 2);
+            line += std::string(1, ' ');
+            // No data flag for L2 P code
+            line += Rinex_Printer::doub2for(my_zero, 18, 2);
+            line += std::string(1, ' ');
+            double GPS_week_continuous_number = static_cast<double>(gps_ephemeris_iter->second.i_GPS_week + 1024); // valid until April 7, 2019 (check http://www.colorado.edu/geography/gcraft/notes/gps/gpseow.htm)
+            line += Rinex_Printer::doub2for(GPS_week_continuous_number, 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(my_zero, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 6
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(static_cast<double>(gps_ephemeris_iter->second.i_URA), 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(static_cast<double>(gps_ephemeris_iter->second.i_signal_health), 18, 2);
+            line += std::string(1, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_TGD, 18, 2);
+            line += std::string(1, ' ');
+            // no IODC in CNAV, so we set it to zero
+            line += Rinex_Printer::doub2for(my_zero, 18, 2);
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+
+
+            // -------- BROADCAST ORBIT - 7
+            line.clear();
+            line += std::string(5, ' ');
+            line += Rinex_Printer::doub2for(gps_ephemeris_iter->second.d_TOW, 18, 2);
+            line += std::string(1, ' ');
+            double curve_fit_interval = 3; /// ?? Not defined in CNAV
+            line += Rinex_Printer::doub2for(curve_fit_interval, 18, 2);
+            line += std::string(1, ' ');
+            line += std::string(18, ' '); // spare
+            line += std::string(1, ' ');
+            line += std::string(18, ' '); // spare
+            Rinex_Printer::lengthCheck(line);
+            out << line << std::endl;
+            line.clear();
+        }
+}
+
+
+void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int, Galileo_Ephemeris>& eph_map)
 {
     std::string line;
     std::map<int,Galileo_Ephemeris>::const_iterator galileo_ephemeris_iter;
@@ -1227,7 +2015,7 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int, Galile
             galileo_ephemeris_iter++)
         {
             // -------- SV / EPOCH / SV CLK
-            boost::posix_time::ptime p_utc_time = Rinex_Printer::compute_Galileo_time(galileo_ephemeris_iter->second, galileo_ephemeris_iter->second.TOW_5);
+            boost::posix_time::ptime p_utc_time = Rinex_Printer::compute_Galileo_time(galileo_ephemeris_iter->second, galileo_ephemeris_iter->second.t0e_1);
             std::string timestring = boost::posix_time::to_iso_string(p_utc_time);
             std::string month (timestring, 4, 2);
             std::string day (timestring, 6, 2);
@@ -1396,7 +2184,7 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int, Galile
 }
 
 
-void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int, Gps_Ephemeris>& gps_eph_map, const std::map<int, Galileo_Ephemeris>& galileo_eph_map)
+void Rinex_Printer::log_rinex_nav(std::fstream& out, const std::map<int, Gps_Ephemeris>& gps_eph_map, const std::map<int, Galileo_Ephemeris>& galileo_eph_map)
 {
     version = 3;
     stringVersion = "3.02";
@@ -1405,9 +2193,8 @@ void Rinex_Printer::log_rinex_nav(std::ofstream& out, const std::map<int, Gps_Ep
 }
 
 
-void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& eph, const double d_TOW_first_observation)
+void Rinex_Printer::rinex_obs_header(std::fstream& out, const Gps_Ephemeris& eph, const double d_TOW_first_observation)
 {
-
     std::string line;
 
     // -------- Line 1
@@ -1548,7 +2335,7 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& ep
     Rinex_Printer::lengthCheck(line);
     out << line << std::endl;
 
-    if (version==2)
+    if (version == 2)
         {
             // --------- WAVELENGHT FACTOR
             // put here real data!
@@ -1561,7 +2348,7 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& ep
             out << line << std::endl;
         }
 
-    if (version==3)
+    if (version == 3)
         {
             // -------- SYS / OBS TYPES
             // one line per available system
@@ -1596,7 +2383,7 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& ep
             out << line << std::endl;
         }
 
-    if (version==2)
+    if (version == 2)
         {
             // -------- SYS / OBS TYPES
             line.clear();
@@ -1622,7 +2409,7 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& ep
             out << line << std::endl;
         }
 
-    if (version==3)
+    if (version == 3)
         {
             // -------- Signal Strength units
             line.clear();
@@ -1667,8 +2454,442 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& ep
 }
 
 
+void Rinex_Printer::rinex_obs_header(std::fstream & out, const Gps_CNAV_Ephemeris & eph, const double d_TOW_first_observation)
+{
+    std::string line;
 
-void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Galileo_Ephemeris& eph, const double d_TOW_first_observation)
+    // -------- Line 1
+    line = std::string(5, ' ');
+    line += stringVersion;
+    line += std::string(11, ' ');
+    line += Rinex_Printer::leftJustify("OBSERVATION DATA", 20);
+    line += satelliteSystem["GPS"];
+    line += std::string(19, ' ');
+    line += std::string("RINEX VERSION / TYPE");
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 2
+    line.clear();
+    line += Rinex_Printer::leftJustify("G = GPS  R = GLONASS  E = GALILEO  S = GEO  M = MIXED", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 3
+    line.clear();
+    line += Rinex_Printer::getLocalTime();
+    line += std::string("PGM / RUN BY / DATE");
+    line += std::string(1, ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("GPS OBSERVATION DATA FILE GENERATED BY GNSS-SDR", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    std::string gnss_sdr_version(GNSS_SDR_VERSION);
+    line += "GNSS-SDR VERSION ";
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 43);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("See http://gnss-sdr.org", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line MARKER NAME
+    line.clear();
+    line += Rinex_Printer::leftJustify("DEFAULT MARKER NAME", 60); // put a flag or a property,
+    line += Rinex_Printer::leftJustify("MARKER NAME", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line MARKER TYPE
+    //line.clear();
+    //line += Rinex_Printer::leftJustify("GROUND_CRAFT", 20); // put a flag or a property
+    //line += std::string(40, ' ');
+    //line += Rinex_Printer::leftJustify("MARKER TYPE", 20);
+    //Rinex_Printer::lengthCheck(line);
+    //out << line << std::endl;
+
+    // -------- Line OBSERVER / AGENCY
+    line.clear();
+    std::string username;
+    char c_username[20] = {0};
+    int nGet = getlogin_r(c_username, sizeof(c_username) - 1);
+    if (nGet == 0)
+        {
+            username = c_username;
+        }
+    else
+        {
+            username = "UNKNOWN USER";
+        }
+    line += leftJustify(username, 20);
+    line += Rinex_Printer::leftJustify("CTTC", 40); // add flag and property
+    line += Rinex_Printer::leftJustify("OBSERVER / AGENCY", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line  REC / TYPE VERS
+    line.clear();
+    line += Rinex_Printer::leftJustify("GNSS-SDR", 20); // add flag and property
+    line += Rinex_Printer::leftJustify("Software Receiver", 20); // add flag and property
+    //line += Rinex_Printer::leftJustify(google::VersionString(), 20); // add flag and property
+    if(gnss_sdr_version.length() > 20) gnss_sdr_version.resize(9, ' ');
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 20);
+    line += Rinex_Printer::leftJustify("REC # / TYPE / VERS", 20);
+    lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- ANTENNA TYPE
+    line.clear();
+    line += Rinex_Printer::leftJustify("Antenna number", 20);  // add flag and property
+    line += Rinex_Printer::leftJustify("Antenna type", 20);  // add flag and property
+    line += std::string(20, ' ');
+    line += Rinex_Printer::leftJustify("ANT # / TYPE", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- APPROX POSITION  (optional for moving platforms)
+    // put here real data!
+    double antena_x = 0.0;
+    double antena_y = 0.0;
+    double antena_z = 0.0;
+    line.clear();
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_x, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_y, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_z, 4), 14);
+    line += std::string(18, ' ');
+    line += Rinex_Printer::leftJustify("APPROX POSITION XYZ", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- ANTENNA: DELTA H/E/N
+    // put here real data!
+    double antena_h = 0.0;
+    double antena_e = 0.0;
+    double antena_n = 0.0;
+    line.clear();
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_h, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_e, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_n, 4), 14);
+    line += std::string(18, ' ');
+    line += Rinex_Printer::leftJustify("ANTENNA: DELTA H/E/N", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- SYS / OBS TYPES
+    // one line per available system
+    line.clear();
+    line += satelliteSystem["GPS"];
+    line += std::string(2, ' ');
+    std::stringstream strm;
+    numberTypesObservations = 4;
+    strm << numberTypesObservations;
+    line += Rinex_Printer::rightJustify(strm.str(), 3);
+    // per type of observation
+    // GPS L2 PSEUDORANGE
+    line += std::string(1, ' ');
+    line += observationType["PSEUDORANGE"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS L2 PHASE
+    line += std::string(1, ' ');
+    line += observationType["CARRIER_PHASE"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS DOPPLER L2
+    line += std::string(1, ' ');
+    line += observationType["DOPPLER"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS L2 SIGNAL STRENGTH
+    line += std::string(1, ' ');
+    line += observationType["SIGNAL_STRENGTH"];
+    line += observationCode["GPS_L2_L2CM"];
+
+    line += std::string(60-line.size(), ' ');
+    line += Rinex_Printer::leftJustify("SYS / # / OBS TYPES", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Signal Strength units
+    line.clear();
+    line += Rinex_Printer::leftJustify("DBHZ", 20);
+    line += std::string(40, ' ');
+    line += Rinex_Printer::leftJustify("SIGNAL STRENGTH UNIT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- TIME OF FIRST OBS
+    line.clear();
+    boost::posix_time::ptime p_gps_time = Rinex_Printer::compute_GPS_time(eph,d_TOW_first_observation);
+    std::string timestring = boost::posix_time::to_iso_string(p_gps_time);
+    std::string year (timestring, 0, 4);
+    std::string month (timestring, 4, 2);
+    std::string day (timestring, 6, 2);
+    std::string hour (timestring, 9, 2);
+    std::string minutes (timestring, 11, 2);
+    double gps_t = d_TOW_first_observation;
+    double seconds = fmod(gps_t, 60);
+    line += Rinex_Printer::rightJustify(year, 6);
+    line += Rinex_Printer::rightJustify(month, 6);
+    line += Rinex_Printer::rightJustify(day, 6);
+    line += Rinex_Printer::rightJustify(hour, 6);
+    line += Rinex_Printer::rightJustify(minutes, 6);
+    line += Rinex_Printer::rightJustify(asString(seconds, 7), 13);
+    line += Rinex_Printer::rightJustify(std::string("GPS"), 8);
+    line += std::string(9, ' ');
+    line += Rinex_Printer::leftJustify("TIME OF FIRST OBS", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- SYS /PHASE SHIFTS
+
+    // -------- end of header
+    line.clear();
+    line += std::string(60, ' ');
+    line += Rinex_Printer::leftJustify("END OF HEADER", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+}
+
+
+void Rinex_Printer::rinex_obs_header(std::fstream & out, const Gps_Ephemeris & eph, const Gps_CNAV_Ephemeris & eph_cnav, const double d_TOW_first_observation)
+{
+    if(eph_cnav.d_i_0){} // avoid warning, not needed
+    std::string line;
+
+    // -------- Line 1
+    line = std::string(5, ' ');
+    line += stringVersion;
+    line += std::string(11, ' ');
+    line += Rinex_Printer::leftJustify("OBSERVATION DATA", 20);
+    line += satelliteSystem["GPS"];
+    line += std::string(19, ' ');
+    line += std::string("RINEX VERSION / TYPE");
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 2
+    line.clear();
+    line += Rinex_Printer::leftJustify("G = GPS  R = GLONASS  E = GALILEO  S = GEO  M = MIXED", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line 3
+    line.clear();
+    line += Rinex_Printer::getLocalTime();
+    line += std::string("PGM / RUN BY / DATE");
+    line += std::string(1, ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("GPS OBSERVATION DATA FILE GENERATED BY GNSS-SDR", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    std::string gnss_sdr_version(GNSS_SDR_VERSION);
+    line += "GNSS-SDR VERSION ";
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 43);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line COMMENT
+    line.clear();
+    line += Rinex_Printer::leftJustify("See http://gnss-sdr.org", 60);
+    line += Rinex_Printer::leftJustify("COMMENT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line MARKER NAME
+    line.clear();
+    line += Rinex_Printer::leftJustify("DEFAULT MARKER NAME", 60); // put a flag or a property,
+    line += Rinex_Printer::leftJustify("MARKER NAME", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line MARKER TYPE
+    //line.clear();
+    //line += Rinex_Printer::leftJustify("GROUND_CRAFT", 20); // put a flag or a property
+    //line += std::string(40, ' ');
+    //line += Rinex_Printer::leftJustify("MARKER TYPE", 20);
+    //Rinex_Printer::lengthCheck(line);
+    //out << line << std::endl;
+
+    // -------- Line OBSERVER / AGENCY
+    line.clear();
+    std::string username;
+    char c_username[20] = {0};
+    int nGet = getlogin_r(c_username, sizeof(c_username) - 1);
+    if (nGet == 0)
+        {
+            username = c_username;
+        }
+    else
+        {
+            username = "UNKNOWN USER";
+        }
+    line += leftJustify(username, 20);
+    line += Rinex_Printer::leftJustify("CTTC", 40); // add flag and property
+    line += Rinex_Printer::leftJustify("OBSERVER / AGENCY", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Line  REC / TYPE VERS
+    line.clear();
+    line += Rinex_Printer::leftJustify("GNSS-SDR", 20); // add flag and property
+    line += Rinex_Printer::leftJustify("Software Receiver", 20); // add flag and property
+    //line += Rinex_Printer::leftJustify(google::VersionString(), 20); // add flag and property
+    if(gnss_sdr_version.length() > 20) gnss_sdr_version.resize(9, ' ');
+    line += Rinex_Printer::leftJustify(gnss_sdr_version, 20);
+    line += Rinex_Printer::leftJustify("REC # / TYPE / VERS", 20);
+    lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- ANTENNA TYPE
+    line.clear();
+    line += Rinex_Printer::leftJustify("Antenna number", 20);  // add flag and property
+    line += Rinex_Printer::leftJustify("Antenna type", 20);  // add flag and property
+    line += std::string(20, ' ');
+    line += Rinex_Printer::leftJustify("ANT # / TYPE", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- APPROX POSITION  (optional for moving platforms)
+    // put here real data!
+    double antena_x = 0.0;
+    double antena_y = 0.0;
+    double antena_z = 0.0;
+    line.clear();
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_x, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_y, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_z, 4), 14);
+    line += std::string(18, ' ');
+    line += Rinex_Printer::leftJustify("APPROX POSITION XYZ", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- ANTENNA: DELTA H/E/N
+    // put here real data!
+    double antena_h = 0.0;
+    double antena_e = 0.0;
+    double antena_n = 0.0;
+    line.clear();
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_h, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_e, 4), 14);
+    line += Rinex_Printer::rightJustify(Rinex_Printer::asString(antena_n, 4), 14);
+    line += std::string(18, ' ');
+    line += Rinex_Printer::leftJustify("ANTENNA: DELTA H/E/N", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- SYS / OBS TYPES
+    // one line per available system
+    line.clear();
+    line += satelliteSystem["GPS"];
+    line += std::string(2, ' ');
+    std::stringstream strm;
+    numberTypesObservations = 8;
+    strm << numberTypesObservations;
+    line += Rinex_Printer::rightJustify(strm.str(), 3);
+    // per type of observation
+    // GPS L1 PSEUDORANGE
+    line += std::string(1, ' ');
+    line += observationType["PSEUDORANGE"];
+    line += observationCode["GPS_L1_CA"];
+    // GPS L1 PHASE
+    line += std::string(1, ' ');
+    line += observationType["CARRIER_PHASE"];
+    line += observationCode["GPS_L1_CA"];
+    // GPS DOPPLER L1
+    line += std::string(1, ' ');
+    line += observationType["DOPPLER"];
+    line += observationCode["GPS_L1_CA"];
+    // GPS L1 CA SIGNAL STRENGTH
+    line += std::string(1, ' ');
+    line += observationType["SIGNAL_STRENGTH"];
+    line += observationCode["GPS_L1_CA"];
+    // GPS L2 PSEUDORANGE
+    line += std::string(1, ' ');
+    line += observationType["PSEUDORANGE"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS L2 PHASE
+    line += std::string(1, ' ');
+    line += observationType["CARRIER_PHASE"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS DOPPLER L2
+    line += std::string(1, ' ');
+    line += observationType["DOPPLER"];
+    line += observationCode["GPS_L2_L2CM"];
+    // GPS L2 SIGNAL STRENGTH
+    line += std::string(1, ' ');
+    line += observationType["SIGNAL_STRENGTH"];
+    line += observationCode["GPS_L2_L2CM"];
+
+    line += std::string(60-line.size(), ' ');
+    line += Rinex_Printer::leftJustify("SYS / # / OBS TYPES", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- Signal Strength units
+    line.clear();
+    line += Rinex_Printer::leftJustify("DBHZ", 20);
+    line += std::string(40, ' ');
+    line += Rinex_Printer::leftJustify("SIGNAL STRENGTH UNIT", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- TIME OF FIRST OBS
+    line.clear();
+    boost::posix_time::ptime p_gps_time = Rinex_Printer::compute_GPS_time(eph,d_TOW_first_observation);
+    std::string timestring = boost::posix_time::to_iso_string(p_gps_time);
+    std::string year (timestring, 0, 4);
+    std::string month (timestring, 4, 2);
+    std::string day (timestring, 6, 2);
+    std::string hour (timestring, 9, 2);
+    std::string minutes (timestring, 11, 2);
+    double gps_t = d_TOW_first_observation;
+    double seconds = fmod(gps_t, 60);
+    line += Rinex_Printer::rightJustify(year, 6);
+    line += Rinex_Printer::rightJustify(month, 6);
+    line += Rinex_Printer::rightJustify(day, 6);
+    line += Rinex_Printer::rightJustify(hour, 6);
+    line += Rinex_Printer::rightJustify(minutes, 6);
+    line += Rinex_Printer::rightJustify(asString(seconds, 7), 13);
+    line += Rinex_Printer::rightJustify(std::string("GPS"), 8);
+    line += std::string(9, ' ');
+    line += Rinex_Printer::leftJustify("TIME OF FIRST OBS", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    // -------- SYS /PHASE SHIFTS
+
+    // -------- end of header
+    line.clear();
+    line += std::string(60, ' ');
+    line += Rinex_Printer::leftJustify("END OF HEADER", 20);
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+}
+
+
+void Rinex_Printer::rinex_obs_header(std::fstream& out, const Galileo_Ephemeris& eph, const double d_TOW_first_observation, const std::string bands)
 {
     std::string line;
     version = 3;
@@ -1806,22 +3027,82 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Galileo_Ephemeris
 
     // -------- SYS / OBS TYPES
     // one line per available system
+    unsigned int number_of_observations = 0;
+    std::string signal_("1B");
+    std::size_t found_1B = bands.find(signal_);
+    if(found_1B != std::string::npos)
+        {
+            number_of_observations = number_of_observations + 4;
+        }
+    signal_ = "5X";
+    std::size_t found_5X = bands.find(signal_);
+    if(found_5X != std::string::npos)
+        {
+            number_of_observations = number_of_observations + 4;
+        }
+
     line.clear();
+    signal_ = "7X";
+    std::size_t found_7X = bands.find(signal_);
+    if(found_7X != std::string::npos)
+        {
+            number_of_observations = number_of_observations + 4;
+        }
+
+    line.clear();
+
     line += satelliteSystem["Galileo"];
     line += std::string(2, ' ');
-    line += Rinex_Printer::rightJustify("4", 3);
-    line += std::string(1, ' ');
-    line += observationType["PSEUDORANGE"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["CARRIER_PHASE"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["DOPPLER"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["SIGNAL_STRENGTH"];
-    line += observationCode["GALILEO_E1_B"];
+    line += Rinex_Printer::rightJustify(std::to_string(number_of_observations), 3);
+
+    if(found_1B != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E1_B"];
+        }
+
+    if(found_5X != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E5a_IQ"];
+        }
+
+    if(found_7X != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E5b_IQ"];
+        }
+
     line += std::string(60-line.size(), ' ');
     line += Rinex_Printer::leftJustify("SYS / # / OBS TYPES", 20);
     Rinex_Printer::lengthCheck(line);
@@ -1834,7 +3115,6 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Galileo_Ephemeris
     line += Rinex_Printer::leftJustify("SIGNAL STRENGTH UNIT", 20);
     Rinex_Printer::lengthCheck(line);
     out << line << std::endl;
-        
 
     // -------- TIME OF FIRST OBS
     line.clear();
@@ -1870,8 +3150,9 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Galileo_Ephemeris
 }
 
 
-void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph, const double d_TOW_first_observation)
+void Rinex_Printer::rinex_obs_header(std::fstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph, const double d_TOW_first_observation, const std::string galileo_bands)
 {
+    if(galileo_eph.e_1){} // avoid warning, not needed
     std::string line;
     version = 3;
 
@@ -2038,26 +3319,85 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& gp
     out << line << std::endl;
 
     line.clear();
+    unsigned int number_of_observations_gal = 0;
+    std::string signal_("1B");
+    std::size_t found_1B = galileo_bands.find(signal_);
+    if(found_1B != std::string::npos)
+        {
+            number_of_observations_gal = number_of_observations_gal + 4;
+        }
+    signal_ = "5X";
+    std::size_t found_5X = galileo_bands.find(signal_);
+    if(found_5X != std::string::npos)
+        {
+            number_of_observations_gal = number_of_observations_gal + 4;
+        }
+
+    line.clear();
+    signal_ = "7X";
+    std::size_t found_7X = galileo_bands.find(signal_);
+    if(found_7X != std::string::npos)
+        {
+            number_of_observations_gal = number_of_observations_gal + 4;
+        }
+
+
     line += satelliteSystem["Galileo"];
     line += std::string(2, ' ');
-    line += Rinex_Printer::rightJustify("4", 3);
-    line += std::string(1, ' ');
-    line += observationType["PSEUDORANGE"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["CARRIER_PHASE"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["DOPPLER"];
-    line += observationCode["GALILEO_E1_B"];
-    line += std::string(1, ' ');
-    line += observationType["SIGNAL_STRENGTH"];
-    line += observationCode["GALILEO_E1_B"];
+    line += Rinex_Printer::rightJustify(std::to_string(number_of_observations_gal), 3);
+
+    if(found_1B != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E1_B"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E1_B"];
+        }
+
+    if(found_5X != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E5a_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E5a_IQ"];
+        }
+
+    if(found_7X != std::string::npos)
+        {
+            line += std::string(1, ' ');
+            line += observationType["PSEUDORANGE"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["CARRIER_PHASE"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["DOPPLER"];
+            line += observationCode["GALILEO_E5b_IQ"];
+            line += std::string(1, ' ');
+            line += observationType["SIGNAL_STRENGTH"];
+            line += observationCode["GALILEO_E5b_IQ"];
+        }
+
     line += std::string(60-line.size(), ' ');
     line += Rinex_Printer::leftJustify("SYS / # / OBS TYPES", 20);
     Rinex_Printer::lengthCheck(line);
     out << line << std::endl;
-
 
     // -------- Signal Strength units
     line.clear();
@@ -2098,7 +3438,210 @@ void Rinex_Printer::rinex_obs_header(std::ofstream& out, const Gps_Ephemeris& gp
     out << line << std::endl;
 }
 
-void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, const double obs_time, const std::map<int,Gnss_Synchro>& pseudoranges)
+
+void Rinex_Printer::update_obs_header(std::fstream& out, const Gps_Utc_Model& utc_model)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if (version == 2)
+                        {
+                            if (line_str.find("TIME OF FIRST OBS", 59) != std::string::npos) // TIME OF FIRST OBS last header annotation might change in the future
+                                {
+                                    data.push_back(line_str);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                                    line_aux += std::string(54, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                                {
+                                    data.push_back(line_str);
+                                    no_more_finds = true;
+                                }
+                            else
+                                {
+                                    data.push_back(line_str);
+                                }
+                        }
+
+                    if (version == 3)
+                        {
+                            if (line_str.find("TIME OF FIRST OBS", 59) != std::string::npos)
+                                {
+                                    data.push_back(line_str);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LSF), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_LSF), 6);
+                                    line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_DN), 6);
+                                    line_aux += std::string(36, ' ');
+                                    line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                                    data.push_back(line_aux);
+                                }
+                            else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                                {
+                                    data.push_back(line_str);
+                                    no_more_finds = true;
+                                }
+                            else
+                                {
+                                    data.push_back(line_str);
+                                }
+                        }
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::in | std::ios::app);
+    out.seekp(0, std::ios_base::end);
+}
+
+
+void Rinex_Printer::update_obs_header(std::fstream& out, const Gps_CNAV_Utc_Model& utc_model)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+                    if (line_str.find("TIME OF FIRST OBS", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LS), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.d_DeltaT_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_WN_LSF), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(utc_model.i_DN), 6);
+                            line_aux += std::string(36, ' ');
+                            line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            no_more_finds = true;
+                        }
+                    else
+                        {
+                            data.push_back(line_str);
+                        }
+
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::in | std::ios::app);
+    out.seekp(0, std::ios_base::end);
+}
+
+
+void Rinex_Printer::update_obs_header(std::fstream& out, const Galileo_Utc_Model& galileo_utc_model)
+{
+    std::vector<std::string> data;
+    std::string line_aux;
+
+    out.seekp(0);
+    data.clear();
+
+    bool no_more_finds = false;
+    std::string line_str;
+
+    while(!out.eof())
+        {
+            std::getline(out, line_str);
+
+            if(!no_more_finds)
+                {
+                    line_aux.clear();
+
+                    if (line_str.find("TIME OF FIRST OBS", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.Delta_tLS_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.Delta_tLSF_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.WN_LSF_6), 6);
+                            line_aux += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(galileo_utc_model.DN_6), 6);
+                            line_aux += std::string(36, ' ');
+                            line_aux += Rinex_Printer::leftJustify("LEAP SECONDS", 20);
+                            data.push_back(line_aux);
+                        }
+                    else if (line_str.find("END OF HEADER", 59) != std::string::npos)
+                        {
+                            data.push_back(line_str);
+                            no_more_finds = true;
+                        }
+                    else
+                        {
+                            data.push_back(line_str);
+                        }
+
+                }
+            else
+                {
+                    data.push_back(line_str);
+                }
+        }
+
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::trunc);
+    out.seekp(0);
+    for (int i = 0; i < (int) data.size() - 1; i++)
+        {
+            out << data[i] << std::endl;
+        }
+    out.close();
+    out.open(obsfilename, std::ios::out | std::ios::in |std::ios::app);
+    out.seekp(0, std::ios_base::end);
+}
+
+
+void Rinex_Printer::log_rinex_obs(std::fstream& out, const Gps_Ephemeris& eph, const double obs_time, const std::map<int,Gnss_Synchro>& observables)
 {
     // RINEX observations timestamps are GPS timestamps.
     std::string line;
@@ -2145,27 +3688,32 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
             line += std::string(1, ' ');
             line += minutes;
             line += std::string(1, ' ');
-            line += Rinex_Printer::asString(fmod(gps_t, 60), 7);
+            double second_ = fmod(gps_t, 60);
+            if (second_ < 10)
+                {
+                    line += std::string(1, ' ');
+                }
+            line += Rinex_Printer::asString(second_, 7);
             line += std::string(2, ' ');
             // Epoch flag 0: OK     1: power failure between previous and current epoch   <1: Special event
             line += std::string(1, '0');
             //Number of satellites observed in current epoch
             int numSatellitesObserved = 0;
-            std::map<int, Gnss_Synchro>::const_iterator pseudoranges_iter;
-            for(pseudoranges_iter = pseudoranges.begin();
-                    pseudoranges_iter != pseudoranges.end();
-                    pseudoranges_iter++)
+            std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+            for(observables_iter = observables.begin();
+                    observables_iter != observables.end();
+                    observables_iter++)
                 {
                     numSatellitesObserved++;
                 }
             line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
-            for(pseudoranges_iter = pseudoranges.begin();
-                    pseudoranges_iter != pseudoranges.end();
-                    pseudoranges_iter++)
+            for(observables_iter = observables.begin();
+                    observables_iter != observables.end();
+                    observables_iter++)
                 {
                     line += satelliteSystem["GPS"];
-                    if (static_cast<int>(pseudoranges_iter->first) < 10) line += std::string(1, '0');
-                    line += boost::lexical_cast<std::string>(static_cast<int>(pseudoranges_iter->first));
+                    if (static_cast<int>(observables_iter->second.PRN) < 10) line += std::string(1, '0');
+                    line += boost::lexical_cast<std::string>(static_cast<int>(observables_iter->second.PRN));
                 }
             // Receiver clock offset (optional)
             //line += rightJustify(asString(clockOffset, 12), 15);
@@ -2174,16 +3722,16 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
             out << line << std::endl;
 
 
-            for(pseudoranges_iter = pseudoranges.begin();
-                    pseudoranges_iter != pseudoranges.end();
-                    pseudoranges_iter++)
+            for(observables_iter = observables.begin();
+                    observables_iter != observables.end();
+                    observables_iter++)
                 {
                     std::string lineObs;
                     lineObs.clear();
                     line.clear();
                     // GPS L1 PSEUDORANGE
                     line += std::string(2, ' ');
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Pseudorange_m, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Pseudorange_m, 3), 14);
 
                     //Loss of lock indicator (LLI)
                     int lli = 0; // Include in the observation!!
@@ -2195,13 +3743,34 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
                         {
                             lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
                         }
+
+                    // Signal Strength Indicator (SSI)
+                    int ssi = Rinex_Printer::signalStrength(observables_iter->second.CN0_dB_hz);
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
                     // GPS L1 CA PHASE
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
                     // GPS L1 CA DOPPLER
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_Doppler_hz, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_Doppler_hz, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
                     //GPS L1 SIGNAL STRENGTH
-                    //int ssi=signalStrength(54.0); // The original RINEX 2.11 file stores the RSS in a tabulated format 1-9. However, it is also valid to store the CN0 using dB-Hz units
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.CN0_dB_hz, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.CN0_dB_hz, 3), 14);
                     if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
                     out << lineObs << std::endl;
                 }
@@ -2223,11 +3792,11 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
             line += minutes;
 
             line += std::string(1, ' ');
-            double seconds=fmod(gps_t, 60);
+            double seconds = fmod(gps_t, 60);
             // Add extra 0 if seconds are < 10
             if (seconds < 10)
             {
-            	line +=std::string(1, '0');
+                line += std::string(1, '0');
             }
             line += Rinex_Printer::asString(seconds, 7);
             line += std::string(2, ' ');
@@ -2236,10 +3805,10 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
 
             //Number of satellites observed in current epoch
             int numSatellitesObserved = 0;
-            std::map<int, Gnss_Synchro>::const_iterator pseudoranges_iter;
-            for(pseudoranges_iter = pseudoranges.begin();
-                    pseudoranges_iter != pseudoranges.end();
-                    pseudoranges_iter++)
+            std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+            for(observables_iter = observables.begin();
+                    observables_iter != observables.end();
+                    observables_iter++)
                 {
                     numSatellitesObserved++;
                 }
@@ -2253,17 +3822,17 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
             Rinex_Printer::lengthCheck(line);
             out << line << std::endl;
 
-            for(pseudoranges_iter = pseudoranges.begin();
-                    pseudoranges_iter != pseudoranges.end();
-                    pseudoranges_iter++)
+            for(observables_iter = observables.begin();
+                    observables_iter != observables.end();
+                    observables_iter++)
                 {
                     std::string lineObs;
                     lineObs.clear();
                     lineObs += satelliteSystem["GPS"];
-                    if (static_cast<int>(pseudoranges_iter->first) < 10) lineObs += std::string(1, '0');
-                    lineObs += boost::lexical_cast<std::string>(static_cast<int>(pseudoranges_iter->first));
+                    if (static_cast<int>(observables_iter->second.PRN) < 10) lineObs += std::string(1, '0');
+                    lineObs += boost::lexical_cast<std::string>(static_cast<int>(observables_iter->second.PRN));
                     //lineObs += std::string(2, ' ');
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Pseudorange_m, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Pseudorange_m, 3), 14);
 
                     //Loss of lock indicator (LLI)
                     int lli = 0; // Include in the observation!!
@@ -2276,14 +3845,37 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
                             lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
                         }
 
+                    // Signal Strength Indicator (SSI)
+                    int ssi = Rinex_Printer::signalStrength(observables_iter->second.CN0_dB_hz);
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
                     // GPS L1 CA PHASE
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
 
                     // GPS L1 CA DOPPLER
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_Doppler_hz, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_Doppler_hz, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
 
                     //GPS L1 SIGNAL STRENGTH
-                    lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.CN0_dB_hz, 3), 14);
+                    lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.CN0_dB_hz, 3), 14);
 
                     if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
                     out << lineObs << std::endl;
@@ -2292,12 +3884,324 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& eph, 
 }
 
 
+void Rinex_Printer::log_rinex_obs(std::fstream & out, const Gps_CNAV_Ephemeris & eph, double obs_time, const std::map<int, Gnss_Synchro> & observables)
+{
+    // RINEX observations timestamps are GPS timestamps.
+    std::string line;
 
-void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Galileo_Ephemeris& eph, double obs_time, const std::map<int,Gnss_Synchro>& pseudoranges)
+    boost::posix_time::ptime p_gps_time = Rinex_Printer::compute_GPS_time(eph, obs_time);
+    std::string timestring = boost::posix_time::to_iso_string(p_gps_time);
+    //double utc_t = nav_msg.utc_time(nav_msg.sv_clock_correction(obs_time));
+    //double gps_t = eph.sv_clock_correction(obs_time);
+    double gps_t = obs_time;
+
+    std::string month (timestring, 4, 2);
+    std::string day (timestring, 6, 2);
+    std::string hour (timestring, 9, 2);
+    std::string minutes (timestring, 11, 2);
+
+    std::string year (timestring, 0, 4);
+    line += std::string(1, '>');
+    line += std::string(1, ' ');
+    line += year;
+    line += std::string(1, ' ');
+    line += month;
+    line += std::string(1, ' ');
+    line += day;
+    line += std::string(1, ' ');
+    line += hour;
+    line += std::string(1, ' ');
+    line += minutes;
+
+    line += std::string(1, ' ');
+    double seconds = fmod(gps_t, 60);
+    // Add extra 0 if seconds are < 10
+    if (seconds < 10)
+        {
+            line += std::string(1, '0');
+        }
+    line += Rinex_Printer::asString(seconds, 7);
+    line += std::string(2, ' ');
+    // Epoch flag 0: OK     1: power failure between previous and current epoch   <1: Special event
+    line += std::string(1, '0');
+
+    //Number of satellites observed in current epoch
+    int numSatellitesObserved = 0;
+    std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+    for(observables_iter = observables.begin();
+            observables_iter != observables.end();
+            observables_iter++)
+        {
+            numSatellitesObserved++;
+        }
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
+
+    // Receiver clock offset (optional)
+    //line += rightJustify(asString(clockOffset, 12), 15);
+
+    line += std::string(80 - line.size(), ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    for(observables_iter = observables.begin();
+            observables_iter != observables.end();
+            observables_iter++)
+        {
+            std::string lineObs;
+            lineObs.clear();
+            lineObs += satelliteSystem["GPS"];
+            if (static_cast<int>(observables_iter->second.PRN) < 10) lineObs += std::string(1, '0');
+            lineObs += boost::lexical_cast<std::string>(static_cast<int>(observables_iter->second.PRN));
+            //lineObs += std::string(2, ' ');
+            //GPS L2 PSEUDORANGE
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Pseudorange_m, 3), 14);
+
+            //Loss of lock indicator (LLI)
+            int lli = 0; // Include in the observation!!
+            if (lli == 0)
+                {
+                    lineObs += std::string(1, ' ');
+                }
+            else
+                {
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                }
+
+            // Signal Strength Indicator (SSI)
+            int ssi = Rinex_Printer::signalStrength(observables_iter->second.CN0_dB_hz);
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+            // GPS L2 PHASE
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+            if (lli == 0)
+                {
+                    lineObs += std::string(1, ' ');
+                }
+            else
+                {
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                }
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+            // GPS L2 DOPPLER
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_Doppler_hz, 3), 14);
+            if (lli == 0)
+                {
+                    lineObs += std::string(1, ' ');
+                }
+            else
+                {
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                }
+
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+            //GPS L2 SIGNAL STRENGTH
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.CN0_dB_hz, 3), 14);
+
+            if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
+            out << lineObs << std::endl;
+        }
+}
+
+
+void Rinex_Printer::log_rinex_obs(std::fstream & out, const Gps_Ephemeris & eph, const Gps_CNAV_Ephemeris & eph_cnav, double obs_time, const std::map<int, Gnss_Synchro> & observables)
+{
+    if(eph_cnav.d_i_0){} // avoid warning, not needed
+    // RINEX observations timestamps are GPS timestamps.
+    std::string line;
+
+    boost::posix_time::ptime p_gps_time = Rinex_Printer::compute_GPS_time(eph, obs_time);
+    std::string timestring = boost::posix_time::to_iso_string(p_gps_time);
+    //double utc_t = nav_msg.utc_time(nav_msg.sv_clock_correction(obs_time));
+    //double gps_t = eph.sv_clock_correction(obs_time);
+    double gps_t = obs_time;
+
+    std::string month (timestring, 4, 2);
+    std::string day (timestring, 6, 2);
+    std::string hour (timestring, 9, 2);
+    std::string minutes (timestring, 11, 2);
+
+    std::string year (timestring, 0, 4);
+    line += std::string(1, '>');
+    line += std::string(1, ' ');
+    line += year;
+    line += std::string(1, ' ');
+    line += month;
+    line += std::string(1, ' ');
+    line += day;
+    line += std::string(1, ' ');
+    line += hour;
+    line += std::string(1, ' ');
+    line += minutes;
+
+    line += std::string(1, ' ');
+    double seconds = fmod(gps_t, 60);
+    // Add extra 0 if seconds are < 10
+    if (seconds < 10)
+        {
+            line += std::string(1, '0');
+        }
+    line += Rinex_Printer::asString(seconds, 7);
+    line += std::string(2, ' ');
+    // Epoch flag 0: OK     1: power failure between previous and current epoch   <1: Special event
+    line += std::string(1, '0');
+
+    //Number of satellites observed in current epoch
+
+    //Get maps with GPS L1 and L2 observations
+    std::map<int, Gnss_Synchro> observablesL1;
+    std::map<int, Gnss_Synchro> observablesL2;
+    std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+    std::map<int, Gnss_Synchro>::const_iterator observables_iter2;
+
+    std::multimap<unsigned int, Gnss_Synchro> total_mmap;
+    std::multimap<unsigned int, Gnss_Synchro>::iterator mmap_iter;
+    for(observables_iter = observables.begin();
+            observables_iter != observables.end();
+            observables_iter++)
+        {
+            std::string system_(&observables_iter->second.System, 1);
+            std::string sig_(observables_iter->second.Signal);
+            if((system_.compare("G") == 0) && (sig_.compare("1C") == 0))
+                {
+                    observablesL1.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                    total_mmap.insert(std::pair<unsigned int, Gnss_Synchro>(observables_iter->second.PRN, observables_iter->second));
+                }
+            if((system_.compare("G") == 0) && (sig_.compare("2S") == 0))
+                {
+                    observablesL2.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                    mmap_iter = total_mmap.find(observables_iter->second.PRN);
+                    if(mmap_iter == total_mmap.end())
+                        {
+                            Gnss_Synchro gs = Gnss_Synchro();
+                            total_mmap.insert(std::pair<unsigned int, Gnss_Synchro>(observables_iter->second.PRN, gs));
+                        }
+                    total_mmap.insert(std::pair<unsigned int, Gnss_Synchro>(observables_iter->second.PRN, observables_iter->second));
+                }
+        }
+
+    // Fill with zeros satellites with L1 obs but not L2
+    std::multimap<unsigned int, Gnss_Synchro> mmap_aux;
+    mmap_aux = total_mmap;
+    for(mmap_iter = mmap_aux.begin();
+            mmap_iter != mmap_aux.end();
+            mmap_iter++)
+        {
+            if((total_mmap.count(mmap_iter->second.PRN)) == 1 && (mmap_iter->second.PRN != 0))
+                {
+                    Gnss_Synchro gs = Gnss_Synchro();
+                    std::string sys = "G";
+                    gs.System = *sys.c_str();
+                    std::string sig = "2S";
+                    std::memcpy((void*)gs.Signal, sig.c_str(), 3);
+                    gs.PRN = mmap_iter->second.PRN;
+                    total_mmap.insert(std::pair<unsigned int, Gnss_Synchro>(mmap_iter->second.PRN, gs));
+                }
+        }
+
+    std::set<unsigned int> available_prns;
+    std::set<unsigned int>::iterator it;
+    for(observables_iter = observablesL1.begin();
+            observables_iter != observablesL1.end();
+            observables_iter++)
+        {
+            unsigned int prn_ = observables_iter->second.PRN;
+            it = available_prns.find(prn_);
+            if(it == available_prns.end())
+                {
+                    available_prns.insert(prn_);
+                }
+        }
+
+    for(observables_iter = observablesL2.begin();
+            observables_iter != observablesL2.end();
+            observables_iter++)
+        {
+            unsigned int prn_ = observables_iter->second.PRN;
+            it = available_prns.find(prn_);
+            if(it == available_prns.end())
+                {
+                    available_prns.insert(prn_);
+                }
+        }
+
+    int numSatellitesObserved = available_prns.size();
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
+    // Receiver clock offset (optional)
+    //line += rightJustify(asString(clockOffset, 12), 15);
+    line += std::string(80 - line.size(), ' ');
+    Rinex_Printer::lengthCheck(line);
+    out << line << std::endl;
+
+    std::string lineObs;
+    std::pair <std::multimap<unsigned int, Gnss_Synchro>::iterator, std::multimap<unsigned int, Gnss_Synchro>::iterator> ret;
+    for(it = available_prns.begin();
+            it != available_prns.end();
+            it++)
+        {
+            lineObs.clear();
+            lineObs += satelliteSystem["GPS"];
+            if (static_cast<int>(*it) < 10) lineObs += std::string(1, '0');
+            lineObs += boost::lexical_cast<std::string>(static_cast<int>(*it));
+            ret = total_mmap.equal_range(*it);
+            for (std::multimap<unsigned int, Gnss_Synchro>::iterator iter = ret.first; iter != ret.second; ++iter)
+                {
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Pseudorange_m, 3), 14);
+
+                    //Loss of lock indicator (LLI)
+                    int lli = 0; // Include in the observation!!
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+
+                    // Signal Strength Indicator (SSI)
+                    int ssi = Rinex_Printer::signalStrength(iter->second.CN0_dB_hz);
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // GPS CARRIER PHASE
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_phase_rads / (GALILEO_TWO_PI), 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // GPS  DOPPLER
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_Doppler_hz, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // GPS SIGNAL STRENGTH
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.CN0_dB_hz, 3), 14);
+                }
+
+            if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
+            out << lineObs << std::endl;
+        }
+}
+
+
+void Rinex_Printer::log_rinex_obs(std::fstream& out, const Galileo_Ephemeris& eph, double obs_time, const std::map<int,Gnss_Synchro>& observables, const std::string galileo_bands)
 {
     // RINEX observations timestamps are Galileo timestamps.
     // See http://gage14.upc.es/gLAB/HTML/Observation_Rinex_v3.01.html
-
     std::string line;
 
     boost::posix_time::ptime p_galileo_time = Rinex_Printer::compute_Galileo_time(eph, obs_time);
@@ -2329,7 +4233,7 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Galileo_Ephemeris& e
     // Add extra 0 if seconds are < 10
     if (seconds < 10)
         {
-            line +=std::string(1, '0');
+            line += std::string(1, '0');
         }
     line += Rinex_Printer::asString(seconds, 7);
     line += std::string(2, ' ');
@@ -2337,59 +4241,206 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Galileo_Ephemeris& e
     line += std::string(1, '0');
 
     //Number of satellites observed in current epoch
-    int numSatellitesObserved = 0;
-    std::map<int, Gnss_Synchro>::const_iterator pseudoranges_iter;
-    for(pseudoranges_iter = pseudoranges.begin();
-            pseudoranges_iter != pseudoranges.end();
-            pseudoranges_iter++)
-        {
-            numSatellitesObserved++;
-        }
-    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
 
+    //Get maps with Galileo observations
+    std::map<int, Gnss_Synchro> observablesE1B;
+    std::map<int, Gnss_Synchro> observablesE5A;
+    std::map<int, Gnss_Synchro> observablesE5B;
+    std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+
+    for(observables_iter = observables.begin();
+            observables_iter != observables.end();
+            observables_iter++)
+        {
+            std::string system_(&observables_iter->second.System, 1);
+            std::string sig_(observables_iter->second.Signal);
+            if((system_.compare("E") == 0) && (sig_.compare("1B") == 0))
+                {
+                    observablesE1B.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+            if((system_.compare("E") == 0) && (sig_.compare("5X") == 0))
+                {
+                    observablesE5A.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+            if((system_.compare("E") == 0) && (sig_.compare("7X") == 0))
+                {
+                    observablesE5B.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+        }
+    std::size_t found_1B = galileo_bands.find("1B");
+    std::size_t found_E5a = galileo_bands.find("5X");
+    std::size_t found_E5b = galileo_bands.find("7X");
+
+    std::multimap<unsigned int, Gnss_Synchro> total_map;
+    std::set<unsigned int> available_prns;
+    std::set<unsigned int>::iterator it;
+    if(found_1B != std::string::npos)
+    {
+        for(observables_iter = observablesE1B.begin();
+                observables_iter != observablesE1B.end();
+                observables_iter++)
+            {
+                unsigned int prn_ = observables_iter->second.PRN;
+                total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+                it = available_prns.find(prn_);
+                if(it == available_prns.end())
+                    {
+                        available_prns.insert(prn_);
+                    }
+            }
+    }
+    if(found_E5a != std::string::npos)
+    {
+        for(observables_iter = observablesE5A.begin();
+                observables_iter != observablesE5A.end();
+                observables_iter++)
+            {
+                unsigned int prn_ = observables_iter->second.PRN;
+                it = available_prns.find(prn_);
+                if(it == available_prns.end())
+                    {
+                        available_prns.insert(prn_);
+                        if(found_1B != std::string::npos)
+                        {
+                            Gnss_Synchro gs = Gnss_Synchro();
+                            std::string sys = "E";
+                            gs.System = *sys.c_str();
+                            std::string sig = "1B";
+                            std::memcpy((void*)gs.Signal, sig.c_str(), 3);
+                            gs.PRN = prn_;
+                            total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, gs));
+                        }
+                    }
+                total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+            }
+    }
+    if(found_E5b != std::string::npos)
+    {
+        for(observables_iter = observablesE5B.begin();
+                observables_iter != observablesE5B.end();
+                observables_iter++)
+            {
+                unsigned int prn_ = observables_iter->second.PRN;
+                it = available_prns.find(prn_);
+                if(it == available_prns.end())
+                    {
+                        available_prns.insert(prn_);
+                        if(found_1B != std::string::npos)
+                        {
+                            Gnss_Synchro gs = Gnss_Synchro();
+                            std::string sys = "E";
+                            gs.System = *sys.c_str();
+                            std::string sig = "1B";
+                            std::memcpy((void*)gs.Signal, sig.c_str(), 3);
+                            gs.PRN = prn_;
+                            total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, gs));
+                        }
+                        if(found_E5a != std::string::npos)
+                        {
+                            Gnss_Synchro gs = Gnss_Synchro();
+                            std::string sys = "E";
+                            gs.System = *sys.c_str();
+                            std::string sig = "5X";
+                            std::memcpy((void*)gs.Signal, sig.c_str(), 3);
+                            gs.PRN = prn_;
+                            total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, gs));
+                        }
+                    }
+                else
+                    {
+                        // if 5X is listed but empty
+                        if(found_E5a != std::string::npos)
+                            {
+                                if( (total_map.count(prn_)) == 1)
+                                {
+                                    Gnss_Synchro gs = Gnss_Synchro();
+                                    std::string sys = "E";
+                                    gs.System = *sys.c_str();
+                                    std::string sig = "5X";
+                                    std::memcpy((void*)gs.Signal, sig.c_str(), 3);
+                                    gs.PRN = prn_;
+                                    total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, gs));
+                                }
+                            }
+                    }
+                total_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+            }
+    }
+    int numSatellitesObserved = available_prns.size();
+    line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
     // Receiver clock offset (optional)
     //line += rightJustify(asString(clockOffset, 12), 15);
-
     line += std::string(80 - line.size(), ' ');
     Rinex_Printer::lengthCheck(line);
     out << line << std::endl;
 
-    for(pseudoranges_iter = pseudoranges.begin();
-            pseudoranges_iter != pseudoranges.end();
-            pseudoranges_iter++)
+    std::string lineObs;
+    std::pair <std::multimap<unsigned int, Gnss_Synchro>::iterator, std::multimap<unsigned int, Gnss_Synchro>::iterator> ret;
+    for(it = available_prns.begin();
+            it != available_prns.end();
+            it++)
         {
-            std::string lineObs;
             lineObs.clear();
             lineObs += satelliteSystem["Galileo"];
-            if (static_cast<int>(pseudoranges_iter->first) < 10) lineObs += std::string(1, '0');
-            lineObs += boost::lexical_cast<std::string>(static_cast<int>(pseudoranges_iter->first));
-            //lineObs += std::string(2, ' ');
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Pseudorange_m, 3), 14);
+            if (static_cast<int>(*it) < 10) lineObs += std::string(1, '0');
+            lineObs += boost::lexical_cast<std::string>(static_cast<int>(*it));
+            ret = total_map.equal_range(*it);
+            for (std::multimap<unsigned int, Gnss_Synchro>::iterator iter = ret.first; iter != ret.second; ++iter)
+                {
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Pseudorange_m, 3), 14);
 
-            //Loss of lock indicator (LLI)
-            int lli = 0; // Include in the observation!!
-            if (lli == 0)
-                {
-                    lineObs += std::string(1, ' ');
+                    //Loss of lock indicator (LLI)
+                    int lli = 0; // Include in the observation!!
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+
+                    // Signal Strength Indicator (SSI)
+                    int ssi = Rinex_Printer::signalStrength(iter->second.CN0_dB_hz);
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo CARRIER PHASE
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_phase_rads / (GALILEO_TWO_PI), 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo  DOPPLER
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_Doppler_hz, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo SIGNAL STRENGTH
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.CN0_dB_hz, 3), 14);
                 }
-            else
-                {
-                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
-                }
-            // Galileo E1B PHASE
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_phase_rads / (2 * GALILEO_PI), 3), 14);
-            // Galileo E1B DOPPLER
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_Doppler_hz, 3), 14);
-            // Galileo E1B SIGNAL STRENGTH
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.CN0_dB_hz, 3), 14);
+
             if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
             out << lineObs << std::endl;
         }
 }
 
 
-void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph,  double gps_obs_time, const std::map<int,Gnss_Synchro>& pseudoranges)
+void Rinex_Printer::log_rinex_obs(std::fstream& out, const Gps_Ephemeris& gps_eph, const Galileo_Ephemeris& galileo_eph,  double gps_obs_time, const std::map<int,Gnss_Synchro>& observables)
 {
+    if(galileo_eph.e_1){} // avoid warning, not needed
     std::string line;
 
     boost::posix_time::ptime p_gps_time = Rinex_Printer::compute_GPS_time(gps_eph, gps_obs_time);
@@ -2429,14 +4480,83 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_e
     line += std::string(1, '0');
 
     //Number of satellites observed in current epoch
-    int numSatellitesObserved = 0;
-    std::map<int,Gnss_Synchro>::const_iterator pseudoranges_iter;
-    for(pseudoranges_iter = pseudoranges.begin();
-            pseudoranges_iter != pseudoranges.end();
-            pseudoranges_iter++)
+
+    //Get maps with observations
+    std::map<int, Gnss_Synchro> observablesG1C;
+    std::map<int, Gnss_Synchro> observablesE1B;
+    std::map<int, Gnss_Synchro> observablesE5A;
+    std::map<int, Gnss_Synchro> observablesE5B;
+    std::map<int, Gnss_Synchro>::const_iterator observables_iter;
+
+    for(observables_iter = observables.begin();
+            observables_iter != observables.end();
+            observables_iter++)
         {
-            numSatellitesObserved++;
+            std::string system_(&observables_iter->second.System, 1);
+            std::string sig_(observables_iter->second.Signal);
+            if((system_.compare("E") == 0) && (sig_.compare("1B") == 0))
+                {
+                    observablesE1B.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+            if((system_.compare("E") == 0) && (sig_.compare("5X") == 0))
+                {
+                    observablesE5A.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+            if((system_.compare("E") == 0) && (sig_.compare("7X") == 0))
+                {
+                    observablesE5B.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
+            if((system_.compare("G") == 0) && (sig_.compare("1C") == 0))
+                {
+                    observablesG1C.insert(std::pair<int, Gnss_Synchro>(observables_iter->first, observables_iter->second));
+                }
         }
+
+    std::multimap<unsigned int, Gnss_Synchro> total_gal_map;
+    std::set<unsigned int> available_gal_prns;
+    std::set<unsigned int>::iterator it;
+    for(observables_iter = observablesE1B.begin();
+            observables_iter != observablesE1B.end();
+            observables_iter++)
+        {
+            unsigned int prn_ = observables_iter->second.PRN;
+            total_gal_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+            it = available_gal_prns.find(prn_);
+            if(it == available_gal_prns.end())
+                {
+                    available_gal_prns.insert(prn_);
+                }
+        }
+
+    for(observables_iter = observablesE5A.begin();
+            observables_iter != observablesE5A.end();
+            observables_iter++)
+        {
+            unsigned int prn_ = observables_iter->second.PRN;
+            total_gal_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+            it = available_gal_prns.find(prn_);
+            if(it == available_gal_prns.end())
+                {
+                    available_gal_prns.insert(prn_);
+                }
+        }
+
+    for(observables_iter = observablesE5B.begin();
+            observables_iter != observablesE5B.end();
+            observables_iter++)
+        {
+            unsigned int prn_ = observables_iter->second.PRN;
+            total_gal_map.insert(std::pair<unsigned int, Gnss_Synchro>(prn_, observables_iter->second));
+            it = available_gal_prns.find(prn_);
+            if(it == available_gal_prns.end())
+                {
+                    available_gal_prns.insert(prn_);
+                }
+        }
+
+    int numGalSatellitesObserved = available_gal_prns.size();
+    int numGpsSatellitesObserved = observablesG1C.size();
+    int numSatellitesObserved = numGalSatellitesObserved + numGpsSatellitesObserved;
     line += Rinex_Printer::rightJustify(boost::lexical_cast<std::string>(numSatellitesObserved), 3);
 
     // Receiver clock offset (optional)
@@ -2447,19 +4567,19 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_e
     out << line << std::endl;
 
     std::string s;
-    for(pseudoranges_iter = pseudoranges.begin();
-            pseudoranges_iter != pseudoranges.end();
-            pseudoranges_iter++)
+    std::string lineObs;
+    for(observables_iter = observablesG1C.begin();
+            observables_iter != observablesG1C.end();
+            observables_iter++)
         {
-            std::string lineObs;
             lineObs.clear();
 
-            s.assign(1, pseudoranges_iter->second.System);
+            s.assign(1, observables_iter->second.System);
             if(s.compare("G") == 0) lineObs += satelliteSystem["GPS"];
-            if(s.compare("E") == 0) lineObs += satelliteSystem["Galileo"];
-            if (static_cast<int>(pseudoranges_iter->first) < 10) lineObs += std::string(1, '0');
-            lineObs += boost::lexical_cast<std::string>(static_cast<int>(pseudoranges_iter->first));
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Pseudorange_m, 3), 14);
+            if(s.compare("E") == 0) lineObs += satelliteSystem["Galileo"]; // should not happen
+            if (static_cast<int>(observables_iter->second.PRN) < 10) lineObs += std::string(1, '0');
+            lineObs += boost::lexical_cast<std::string>(static_cast<int>(observables_iter->second.PRN));
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Pseudorange_m, 3), 14);
 
             //Loss of lock indicator (LLI)
             int lli = 0; // Include in the observation!!
@@ -2472,14 +4592,97 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_e
                     lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
                 }
 
+            // Signal Strength Indicator (SSI)
+            int ssi = Rinex_Printer::signalStrength(observables_iter->second.CN0_dB_hz);
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
             // PHASE
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_phase_rads/GPS_TWO_PI, 3), 14);
+            if (lli == 0)
+                {
+                    lineObs += std::string(1, ' ');
+                }
+            else
+                {
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                }
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
 
             // DOPPLER
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.Carrier_Doppler_hz, 3), 14);
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.Carrier_Doppler_hz, 3), 14);
+            if (lli == 0)
+                {
+                    lineObs += std::string(1, ' ');
+                }
+            else
+                {
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                }
+            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
 
             // SIGNAL STRENGTH
-            lineObs += Rinex_Printer::rightJustify(asString(pseudoranges_iter->second.CN0_dB_hz, 3), 14);
+            lineObs += Rinex_Printer::rightJustify(asString(observables_iter->second.CN0_dB_hz, 3), 14);
+
+            if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
+            out << lineObs << std::endl;
+        }
+
+    std::pair <std::multimap<unsigned int, Gnss_Synchro>::iterator, std::multimap<unsigned int, Gnss_Synchro>::iterator> ret;
+    for(it = available_gal_prns.begin();
+            it != available_gal_prns.end();
+            it++)
+        {
+            lineObs.clear();
+            lineObs += satelliteSystem["Galileo"];
+            if (static_cast<int>(*it) < 10) lineObs += std::string(1, '0');
+            lineObs += boost::lexical_cast<std::string>(static_cast<int>(*it));
+            ret = total_gal_map.equal_range(*it);
+            for (std::multimap<unsigned int, Gnss_Synchro>::iterator iter = ret.first; iter != ret.second; ++iter)
+                {
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Pseudorange_m, 3), 14);
+
+                    //Loss of lock indicator (LLI)
+                    int lli = 0; // Include in the observation!!
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+
+                    // Signal Strength Indicator (SSI)
+                    int ssi = Rinex_Printer::signalStrength(iter->second.CN0_dB_hz);
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo CARRIER PHASE
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_phase_rads / (GALILEO_TWO_PI), 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo  DOPPLER
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.Carrier_Doppler_hz, 3), 14);
+                    if (lli == 0)
+                        {
+                            lineObs += std::string(1, ' ');
+                        }
+                    else
+                        {
+                            lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<short>(lli), 1);
+                        }
+                    lineObs += Rinex_Printer::rightJustify(Rinex_Printer::asString<int>(ssi), 1);
+
+                    // Galileo SIGNAL STRENGTH
+                    lineObs += Rinex_Printer::rightJustify(asString(iter->second.CN0_dB_hz, 3), 14);
+                }
 
             if (lineObs.size() < 80) lineObs += std::string(80 - lineObs.size(), ' ');
             out << lineObs << std::endl;
@@ -2487,11 +4690,10 @@ void Rinex_Printer::log_rinex_obs(std::ofstream& out, const Gps_Ephemeris& gps_e
 }
 
 
-
-// represents GPS time (week, TOW) in the date time format of the Gregorian calendar.
-// -> Leap years are considered, but leap seconds not.
 void Rinex_Printer::to_date_time(int gps_week, int gps_tow, int &year, int &month, int &day, int &hour, int &minute, int &second)
 {
+    // represents GPS time (week, TOW) in the date time format of the Gregorian calendar.
+    // -> Leap years are considered, but leap seconds are not.
     int days_per_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     // seconds in a not leap year
@@ -2558,8 +4760,7 @@ void Rinex_Printer::to_date_time(int gps_week, int gps_tow, int &year, int &mont
 }
 
 
-
-void Rinex_Printer::log_rinex_sbs(std::ofstream& out, const Sbas_Raw_Msg& sbs_message)
+void Rinex_Printer::log_rinex_sbs(std::fstream& out, const Sbas_Raw_Msg& sbs_message)
 {
     // line 1: PRN / EPOCH / RCVR
     std::stringstream line1;
@@ -2572,25 +4773,25 @@ void Rinex_Printer::log_rinex_sbs(std::ofstream& out, const Sbas_Raw_Msg& sbs_me
     int gps_week;
     double gps_sec;
     if(sbs_message.get_rx_time_obj().get_gps_time(gps_week, gps_sec))
-    {
-        int year;
-        int month;
-        int day;
-        int hour;
-        int minute;
-        int second;
+        {
+            int year;
+            int month;
+            int day;
+            int hour;
+            int minute;
+            int second;
 
-        double gps_sec_one_digit_precicion = round(gps_sec *10)/10; // to prevent rounding towards 60.0sec in the stream output
-        int gps_tow = trunc(gps_sec_one_digit_precicion);
-        double sub_sec = gps_sec_one_digit_precicion - double(gps_tow);
+            double gps_sec_one_digit_precicion = round(gps_sec *10)/10; // to prevent rounding towards 60.0sec in the stream output
+            int gps_tow = trunc(gps_sec_one_digit_precicion);
+            double sub_sec = gps_sec_one_digit_precicion - double(gps_tow);
 
-        to_date_time(gps_week, gps_tow, year, month, day, hour, minute, second);
-        line1 << asFixWidthString(year, 2, '0') <<  " " << asFixWidthString(month, 2, '0') <<  " " << asFixWidthString(day, 2, '0') <<  " " << asFixWidthString(hour, 2, '0') <<  " " << asFixWidthString(minute, 2, '0') <<  " " << rightJustify(asString(double(second)+sub_sec,1),4,' ');
-    }
+            to_date_time(gps_week, gps_tow, year, month, day, hour, minute, second);
+            line1 << asFixWidthString(year, 2, '0') <<  " " << asFixWidthString(month, 2, '0') <<  " " << asFixWidthString(day, 2, '0') <<  " " << asFixWidthString(hour, 2, '0') <<  " " << asFixWidthString(minute, 2, '0') <<  " " << rightJustify(asString(double(second)+sub_sec,1),4,' ');
+        }
     else
-    {
-        line1 << std::string(19, ' ');
-    }
+        {
+            line1 << std::string(19, ' ');
+        }
     line1 << "  ";
 
     // band
@@ -2619,10 +4820,10 @@ void Rinex_Printer::log_rinex_sbs(std::ofstream& out, const Sbas_Raw_Msg& sbs_me
     // First 18 bytes of message (hex)
     std::vector<unsigned char> msg = sbs_message.get_msg();
     for (size_t i = 0; i < 18 && i <  msg.size(); ++i)
-    {
-        line2 << std::hex << std::setfill('0') << std::setw(2);
-        line2 << int(msg[i]) << " ";
-    }
+        {
+            line2 << std::hex << std::setfill('0') << std::setw(2);
+            line2 << int(msg[i]) << " ";
+        }
     line2 << std::string(19, ' ');
     lengthCheck(line2.str());
     out << line2.str() << std::endl;
@@ -2632,10 +4833,10 @@ void Rinex_Printer::log_rinex_sbs(std::ofstream& out, const Sbas_Raw_Msg& sbs_me
     line3 << std::string(7, ' ');
     // Remaining bytes of message (hex)
     for (size_t i = 18; i < 36 && i <  msg.size(); ++i)
-    {
-        line3 << std::hex << std::setfill('0') << std::setw(2);
-        line3 << int(msg[i]) << " ";
-    }
+        {
+            line3 << std::hex << std::setfill('0') << std::setw(2);
+            line3 << int(msg[i]) << " ";
+        }
     line3 << std::string(31, ' ');
     lengthCheck(line3.str());
     out << line3.str() << std::endl;
@@ -2662,6 +4863,19 @@ boost::posix_time::ptime Rinex_Printer::compute_UTC_time(const Gps_Navigation_Me
 
 
 boost::posix_time::ptime Rinex_Printer::compute_GPS_time(const Gps_Ephemeris& eph, const double obs_time)
+{
+    // The RINEX v2.11 v3.00 format uses GPS time for the observations epoch, not UTC time, thus, no leap seconds needed here.
+    // (see Section 3 in http://igscb.jpl.nasa.gov/igscb/data/format/rinex211.txt)
+    // (see Pag. 17 in http://igscb.jpl.nasa.gov/igscb/data/format/rinex300.pdf)
+    // --??? No time correction here, since it will be done in the RINEX processor
+    const double gps_t = obs_time;
+    boost::posix_time::time_duration t = boost::posix_time::millisec((gps_t + 604800 * static_cast<double>(eph.i_GPS_week % 1024)) * 1000);
+    boost::posix_time::ptime p_time(boost::gregorian::date(1999, 8, 22), t);
+    return p_time;
+}
+
+
+boost::posix_time::ptime Rinex_Printer::compute_GPS_time(const Gps_CNAV_Ephemeris & eph, const double obs_time)
 {
     // The RINEX v2.11 v3.00 format uses GPS time for the observations epoch, not UTC time, thus, no leap seconds needed here.
     // (see Section 3 in http://igscb.jpl.nasa.gov/igscb/data/format/rinex211.txt)
@@ -2705,4 +4919,3 @@ enum RINEX_enumMarkerType {
 };
 
  */
-

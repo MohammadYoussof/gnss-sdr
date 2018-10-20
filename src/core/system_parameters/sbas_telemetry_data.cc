@@ -28,10 +28,11 @@
  * -------------------------------------------------------------------------
  */
 
-#include <stdarg.h>
-#include <stdio.h>
+#include <cmath>
 #include <cstring>
 #include <iostream>
+#include <stdarg.h>
+#include <stdio.h>
 #include <glog/logging.h>
 #include "sbas_telemetry_data.h"
 #include "sbas_ionospheric_correction.h"
@@ -52,11 +53,6 @@ Sbas_Telemetry_Data::Sbas_Telemetry_Data()
     level_trace = 0;    // level of trace
     tick_trace = 0;     // tick time at traceopen (ms)
 
-    raw_msg_queue = nullptr;
-    iono_queue = nullptr;
-    sat_corr_queue = nullptr;
-    ephemeris_queue = nullptr;
-
     d_nav.sbssat.iodp = -1; // make sure that in any case iodp is not equal to the received one
     prn_mask_changed();     // invalidate all satellite corrections
 
@@ -66,31 +62,6 @@ Sbas_Telemetry_Data::Sbas_Telemetry_Data()
             igp_mask_changed(band);
         }
 }
-
-
-void Sbas_Telemetry_Data::set_raw_msg_queue(concurrent_queue<Sbas_Raw_Msg> *raw_msg_queue)
-{
-    this->raw_msg_queue = raw_msg_queue;
-}
-
-
-void Sbas_Telemetry_Data::set_iono_queue(concurrent_queue<Sbas_Ionosphere_Correction> *iono_queue)
-{
-    this->iono_queue = iono_queue;
-}
-
-
-void Sbas_Telemetry_Data::set_sat_corr_queue(concurrent_queue<Sbas_Satellite_Correction> *sat_corr_queue)
-{
-    this->sat_corr_queue = sat_corr_queue;
-}
-
-
-void Sbas_Telemetry_Data::set_ephemeris_queue(concurrent_queue<Sbas_Ephemeris> *ephemeris_queue)
-{
-    this->ephemeris_queue = ephemeris_queue;
-}
-
 
 Sbas_Telemetry_Data::~Sbas_Telemetry_Data()
 {
@@ -150,7 +121,8 @@ int Sbas_Telemetry_Data::update(Sbas_Raw_Msg sbas_raw_msg)
     }
 
     // send it to raw message queue
-    if(raw_msg_queue != nullptr) raw_msg_queue->push(sbas_raw_msg);
+    //TODO: update to new GNURadio msg queue
+    //if(raw_msg_queue != nullptr) raw_msg_queue->push(sbas_raw_msg);
     return parsing_result;
 }
 
@@ -200,7 +172,8 @@ void Sbas_Telemetry_Data::updated_sbas_ephemeris(Sbas_Raw_Msg msg)
     seph.print(ss);
     VLOG(FLOW) << ss.str();
 
-    if(ephemeris_queue != nullptr) ephemeris_queue->push(seph);
+    //todo_Update to new GNURadio msg queue
+    //if(ephemeris_queue != nullptr) ephemeris_queue->push(seph);
 }
 
 
@@ -241,7 +214,8 @@ void Sbas_Telemetry_Data::received_iono_correction()
     VLOG(EVENT) << ss.str();
 
     // send to SBAS ionospheric correction queue
-    if(iono_queue != nullptr) iono_queue->push(iono_corr);
+    //todo_Update to new GNURadio msg queue
+    //if(iono_queue != nullptr) iono_queue->push(iono_corr);
 }
 
 
@@ -313,7 +287,7 @@ void Sbas_Telemetry_Data::updated_satellite_corrections()
                     fcorr.d_prc = fcorr_rtklib.prc;
                     fcorr.d_rrc = fcorr_rtklib.rrc;
                     fcorr.d_dt = fcorr_rtklib.dt;
-                    fcorr.d_udre = fcorr_rtklib.udre;	// UDRE
+                    fcorr.d_udre = fcorr_rtklib.udre;    // UDRE
                     fcorr.d_ai = fcorr_rtklib.ai;
                     fcorr.d_tlat = d_nav.sbssat.tlat;
 
@@ -375,7 +349,8 @@ void Sbas_Telemetry_Data::updated_satellite_corrections()
 
                     if(fast_correction_updated || long_term_correction_updated)
                         {
-                            if(sat_corr_queue != nullptr) sat_corr_queue->push(sbas_satelite_correction);
+                            //todo_Update to new GNURadio msg queue
+                            //if(sat_corr_queue != nullptr) sat_corr_queue->push(sbas_satelite_correction);
                         }
                 }
             VLOG(FLOW) << ss.str(); ss.str("");
@@ -466,8 +441,8 @@ int Sbas_Telemetry_Data::getbits(const unsigned char *buff, int pos, int len)
  *-----------------------------------------------------------------------------*/
 Sbas_Telemetry_Data::gtime_t Sbas_Telemetry_Data::epoch2time(const double *ep)
 {
-    const int doy[]={1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
-    gtime_t time = {0};
+    const int doy[] = {1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335};
+    gtime_t time = gtime_t();
     int days, sec, year = (int)ep[0], mon = (int)ep[1], day = (int)ep[2];
 
     if (year < 1970 || 2099 < year || mon < 1 || 12 < mon) return time;
@@ -687,7 +662,7 @@ int Sbas_Telemetry_Data::decode_sbstype7(const sbsmsg_t *msg, sbssat_t *sbssat)
 /* decode type 9: geo navigation message -------------------------------------*/
 int Sbas_Telemetry_Data::decode_sbstype9(const sbsmsg_t *msg, nav_t *nav)
 {
-    seph_t seph = {0};
+    seph_t seph;
     int i;
     int sat;
 
@@ -722,7 +697,7 @@ int Sbas_Telemetry_Data::decode_sbstype9(const sbsmsg_t *msg, nav_t *nav)
     seph.af1 = getbits(msg->msg, 218, 8)*P2_39/2.0;
 
     i = msg->prn-MINPRNSBS;
-    if (!nav->seph || fabs(nav->seph[i].t0 - seph.t0) < 1E-3)
+    if (std::abs(nav->seph[i].t0 - seph.t0) < 1E-3)
         { /* not change */
             VLOG(FLOW) << "<<T>> no change in ephemeris -> won't parse";
             return 0;

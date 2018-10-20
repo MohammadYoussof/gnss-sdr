@@ -1,11 +1,11 @@
 /*!
  * \file volk_gnsssdr_8i_max_s8i.h
- * \brief Volk protokernel: calculates the maximum value in a group of 8 bits (char) scalars
+ * \brief VOLK_GNSSSDR kernel: calculates the maximum value in a group of 8 bits (char) scalars.
  * \authors <ul>
  *          <li> Andres Cecilia, 2014. a.cecilia.luque(at)gmail.com
  *          </ul>
  *
- * Volk protokernel that returns the maximum value of a group of 8 bits (char) scalars
+ * VOLK_GNSSSDR kernel that returns the maximum value of a group of 8 bits (char) scalars
  *
  * -------------------------------------------------------------------------
  *
@@ -32,27 +32,42 @@
  * -------------------------------------------------------------------------
  */
 
-#ifndef INCLUDED_volk_gnsssdr_8i_max_s8i_u_H
-#define INCLUDED_volk_gnsssdr_8i_max_s8i_u_H
+/*!
+ * \page volk_gnsssdr_8i_max_s8i
+ *
+ * \b Overview
+ *
+ * Returns the max value in \p src0
+ *
+ * <b>Dispatcher Prototype</b>
+ * \code
+ * void volk_gnsssdr_8i_max_s8i(char* target, const char* src0, unsigned int num_points);
+ * \endcode
+ *
+ * \b Inputs
+ * \li src0: The buffer of data to be analyzed.
+ * \li num_points: The number of values in \p src0 to be analyzed.
+ *
+ * \b Outputs
+ * \li target: The max value in \p src0
+ *
+ */
+
+#ifndef INCLUDED_volk_gnsssdr_8i_max_s8i_H
+#define INCLUDED_volk_gnsssdr_8i_max_s8i_H
 
 #include <volk_gnsssdr/volk_gnsssdr_common.h>
-#include <inttypes.h>
-#include <stdio.h>
 
 #ifdef LV_HAVE_SSE4_1
 #include <smmintrin.h>
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_u_sse4_1(char target, const char* src0, unsigned int num_points)
+
+static inline void volk_gnsssdr_8i_max_s8i_u_sse4_1(char* target, const char* src0, unsigned int num_points)
 {
     if(num_points > 0)
         {
             const unsigned int sse_iters = num_points / 16;
-
+            unsigned int number;
+            unsigned int i;
             char* inputPtr = (char*)src0;
             char max = src0[0];
             __VOLK_ATTR_ALIGNED(16) char maxValuesBuffer[16];
@@ -60,7 +75,7 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse4_1(char target, const char* src
 
             maxValues = _mm_set1_epi8(max);
 
-            for(unsigned int number = 0; number < sse_iters; number++)
+            for(number = 0; number < sse_iters; number++)
                 {
                     currentValues  = _mm_loadu_si128((__m128i*)inputPtr);
                     compareResults = _mm_cmpgt_epi8(maxValues, currentValues);
@@ -70,7 +85,7 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse4_1(char target, const char* src
 
             _mm_storeu_si128((__m128i*)maxValuesBuffer, maxValues);
 
-            for(unsigned int i = 0; i<16; ++i)
+            for(i = 0; i < 16; ++i)
                 {
                     if(maxValuesBuffer[i] > max)
                         {
@@ -78,33 +93,30 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse4_1(char target, const char* src
                         }
                 }
 
-            for(unsigned int i = 0; i<(num_points % 16); ++i)
+            for(i = sse_iters * 16; i < num_points; ++i)
                 {
                     if(src0[i] > max)
                         {
                             max = src0[i];
                         }
                 }
-            target = max;
+            target[0] = max;
         }
 }
 
 #endif /*LV_HAVE_SSE4_1*/
 
+
 #ifdef LV_HAVE_SSE2
 #include<emmintrin.h>
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_u_sse2(char target, const char* src0, unsigned int num_points)
+
+static inline void volk_gnsssdr_8i_max_s8i_u_sse2(char* target, const char* src0, unsigned int num_points)
 {
     if(num_points > 0)
         {
             const unsigned int sse_iters = num_points / 16;
-
+            unsigned int number;
+            unsigned int i;
             char* inputPtr = (char*)src0;
             char max = src0[0];
             unsigned short mask;
@@ -113,7 +125,7 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse2(char target, const char* src0,
 
             maxValues = _mm_set1_epi8(max);
 
-            for(unsigned int number = 0; number < sse_iters; number++)
+            for(number = 0; number < sse_iters; number++)
                 {
                     currentValues  = _mm_loadu_si128((__m128i*)inputPtr);
                     compareResults = _mm_cmpgt_epi8(maxValues, currentValues);
@@ -123,7 +135,7 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse2(char target, const char* src0,
                         {
                             _mm_storeu_si128((__m128i*)&currentValuesBuffer, currentValues);
                             mask = ~mask;
-                            int i = 0;
+                            i = 0;
                             while (mask > 0)
                                 {
                                     if ((mask & 1) == 1)
@@ -141,69 +153,52 @@ static inline void volk_gnsssdr_8i_max_s8i_u_sse2(char target, const char* src0,
                     inputPtr += 16;
                 }
 
-            for(unsigned int i = 0; i<(num_points % 16); ++i)
+            for(i = sse_iters * 16; i < num_points; ++i)
                 {
                     if(src0[i] > max)
                         {
                             max = src0[i];
                         }
                 }
-            target = max;
+            target[0] = max;
         }
 }
 
 #endif /*LV_HAVE_SSE2*/
 
+
 #ifdef LV_HAVE_GENERIC
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_generic(char target, const char* src0, unsigned int num_points)
+
+static inline void volk_gnsssdr_8i_max_s8i_generic(char* target, const char* src0, unsigned int num_points)
 {
     if(num_points > 0)
         {
             char max = src0[0];
-
-            for(unsigned int i = 1; i < num_points; ++i)
+            unsigned int i;
+            for(i = 1; i < num_points; ++i)
                 {
                     if(src0[i] > max)
                         {
                             max = src0[i];
                         }
                 }
-            target = max;
+            target[0] = max;
         }
 }
 
 #endif /*LV_HAVE_GENERIC*/
 
-#endif /*INCLUDED_volk_gnsssdr_8i_max_s8i_u_H*/
-
-
-#ifndef INCLUDED_volk_gnsssdr_8i_max_s8i_a_H
-#define INCLUDED_volk_gnsssdr_8i_max_s8i_a_H
-
-#include <volk_gnsssdr/volk_gnsssdr_common.h>
-#include <inttypes.h>
-#include <stdio.h>
 
 #ifdef LV_HAVE_SSE4_1
 #include <smmintrin.h>
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_a_sse4_1(char target, const char* src0, unsigned int num_points)
+
+static inline void volk_gnsssdr_8i_max_s8i_a_sse4_1(char* target, const char* src0, unsigned int num_points)
 {
     if(num_points > 0)
         {
             const unsigned int sse_iters = num_points / 16;
-
+            unsigned int number;
+            unsigned int i;
             char* inputPtr = (char*)src0;
             char max = src0[0];
             __VOLK_ATTR_ALIGNED(16) char maxValuesBuffer[16];
@@ -211,7 +206,7 @@ static inline void volk_gnsssdr_8i_max_s8i_a_sse4_1(char target, const char* src
 
             maxValues = _mm_set1_epi8(max);
 
-            for(unsigned int number = 0; number < sse_iters; number++)
+            for(number = 0; number < sse_iters; number++)
                 {
                     currentValues  = _mm_load_si128((__m128i*)inputPtr);
                     compareResults = _mm_cmpgt_epi8(maxValues, currentValues);
@@ -221,7 +216,7 @@ static inline void volk_gnsssdr_8i_max_s8i_a_sse4_1(char target, const char* src
 
             _mm_store_si128((__m128i*)maxValuesBuffer, maxValues);
 
-            for(unsigned int i = 0; i<16; ++i)
+            for(i = 0; i < 16; ++i)
                 {
                     if(maxValuesBuffer[i] > max)
                         {
@@ -229,33 +224,30 @@ static inline void volk_gnsssdr_8i_max_s8i_a_sse4_1(char target, const char* src
                         }
                 }
 
-            for(unsigned int i = 0; i<(num_points % 16); ++i)
+            for(i = sse_iters * 16; i < num_points; ++i)
                 {
                     if(src0[i] > max)
                         {
                             max = src0[i];
                         }
                 }
-            target = max;
+            target[0] = max;
         }
 }
 
 #endif /*LV_HAVE_SSE4_1*/
 
+
 #ifdef LV_HAVE_SSE2
 #include <emmintrin.h>
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_a_sse2(char target, const char* src0, unsigned int num_points)
+
+static inline void volk_gnsssdr_8i_max_s8i_a_sse2(char* target, const char* src0, unsigned int num_points)
 {
     if(num_points > 0)
         {
             const unsigned int sse_iters = num_points / 16;
-
+            unsigned int number;
+            unsigned int i;
             char* inputPtr = (char*)src0;
             char max = src0[0];
             unsigned short mask;
@@ -264,7 +256,7 @@ static inline void volk_gnsssdr_8i_max_s8i_a_sse2(char target, const char* src0,
 
             maxValues = _mm_set1_epi8(max);
 
-            for(unsigned int number = 0; number < sse_iters; number++)
+            for(number = 0; number < sse_iters; number++)
                 {
                     currentValues  = _mm_load_si128((__m128i*)inputPtr);
                     compareResults = _mm_cmpgt_epi8(maxValues, currentValues);
@@ -292,45 +284,18 @@ static inline void volk_gnsssdr_8i_max_s8i_a_sse2(char target, const char* src0,
                     inputPtr += 16;
                 }
 
-            for(unsigned int i = 0; i<(num_points % 16); ++i)
+            for(i = sse_iters * 16; i < num_points; ++i)
                 {
                     if(src0[i] > max)
                         {
                             max = src0[i];
                         }
                 }
-            target = max;
+            target[0] = max;
         }
 }
 
 #endif /*LV_HAVE_SSE2*/
 
-#ifdef LV_HAVE_GENERIC
-/*!
- \brief Returns the max value in src0
- \param target The max value in src0
- \param src0 The buffer of data to be analysed
- \param num_points The number of values in src0 to be analysed
- */
-static inline void volk_gnsssdr_8i_max_s8i_a_generic(char target, const char* src0, unsigned int num_points)
-{
-    if(num_points > 0)
-        {
-            if(num_points > 0)
-                {
-                    char max = src0[0];
-                    for(unsigned int i = 1; i < num_points; ++i)
-                        {
-                            if(src0[i] > max)
-                                {
-                                    max = src0[i];
-                                }
-                        }
-                    target = max;
-                }
-        }
-}
 
-#endif /*LV_HAVE_GENERIC*/
-
-#endif /*INCLUDED_volk_gnsssdr_8i_max_s8i_a_H*/
+#endif /*INCLUDED_volk_gnsssdr_8i_max_s8i_H*/

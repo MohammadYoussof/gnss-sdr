@@ -32,7 +32,6 @@
 #ifndef GNSS_SDR_GPS_UTC_MODEL_H_
 #define GNSS_SDR_GPS_UTC_MODEL_H_
 
-#include "GPS_L1_CA.h"
 #include "boost/assign.hpp"
 #include <boost/serialization/nvp.hpp>
 
@@ -68,7 +67,7 @@ public:
     void serialize(Archive& archive, const unsigned int version)
     {
         using boost::serialization::make_nvp;
-
+        if(version){};
         archive & make_nvp("valid",valid);
         archive & make_nvp("d_A1",d_A1);
         archive & make_nvp("d_A0",d_A0);

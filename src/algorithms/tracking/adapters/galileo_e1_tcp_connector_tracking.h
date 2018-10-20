@@ -40,7 +40,6 @@
 #define GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "tracking_interface.h"
 #include "galileo_e1_tcp_connector_tracking_cc.h"
 
@@ -52,14 +51,11 @@ class ConfigurationInterface;
  */
 class GalileoE1TcpConnectorTracking : public TrackingInterface
 {
-
 public:
-
-  GalileoE1TcpConnectorTracking(ConfigurationInterface* configuration,
+    GalileoE1TcpConnectorTracking(ConfigurationInterface* configuration,
             std::string role,
             unsigned int in_streams,
-            unsigned int out_streams,
-            boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GalileoE1TcpConnectorTracking();
 
@@ -67,6 +63,7 @@ public:
     {
         return role_;
     }
+
     //! Returns "Galileo_E1_TCP_CONNECTOR_Tracking"
     std::string implementation()
     {
@@ -95,25 +92,16 @@ public:
      */
     void set_gnss_synchro(Gnss_Synchro* p_gnss_synchro);
 
-    /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
 
     void start_tracking();
 
 private:
-
     galileo_e1_tcp_connector_tracking_cc_sptr tracking_;
     size_t item_size_;
-
     unsigned int channel_;
-
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 };
 
 #endif // GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_H_

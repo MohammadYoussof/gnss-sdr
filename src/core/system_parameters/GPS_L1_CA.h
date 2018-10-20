@@ -32,10 +32,8 @@
 #ifndef GNSS_SDR_GPS_L1_CA_H_
 #define GNSS_SDR_GPS_L1_CA_H_
 
-#include <complex>
 #include <vector>
 #include <utility> // std::pair
-#include <gnss_satellite.h>
 #include "MATH_CONSTANTS.h"
 
 // Physical constants
@@ -53,6 +51,7 @@ const double GPS_L1_FREQ_HZ              = 1.57542e9; //!< L1 [Hz]
 const double GPS_L1_CA_CODE_RATE_HZ      = 1.023e6;   //!< GPS L1 C/A code rate [chips/s]
 const double GPS_L1_CA_CODE_LENGTH_CHIPS = 1023.0;    //!< GPS L1 C/A code length [chips]
 const double GPS_L1_CA_CODE_PERIOD       = 0.001;     //!< GPS L1 C/A code period [seconds]
+const double GPS_L1_CA_CHIP_PERIOD       = 9.7752e-07;     //!< GPS L1 C/A chip period [seconds]
 
 /*!
  * \brief Maximum Time-Of-Arrival (TOA) difference between satellites for a receiver operated on Earth surface is 20 ms
@@ -67,16 +66,23 @@ const double MAX_TOA_DELAY_MS = 20;
 //#define NAVIGATION_SOLUTION_RATE_MS 1000 // this cannot go here
 const double GPS_STARTOFFSET_ms = 68.802; //[ms] Initial sign. travel time (this cannot go here)
 
+
+// OBSERVABLE HISTORY DEEP FOR INTERPOLATION
+const int GPS_L1_CA_HISTORY_DEEP = 100;
+
 // NAVIGATION MESSAGE DEMODULATION AND DECODING
 
 #define GPS_PREAMBLE {1, 0, 0, 0, 1, 0, 1, 1}
 const int GPS_CA_PREAMBLE_LENGTH_BITS = 8;
+const int GPS_CA_PREAMBLE_LENGTH_SYMBOLS = 160;
 const int GPS_CA_TELEMETRY_RATE_BITS_SECOND = 50;   //!< NAV message bit rate [bits/s]
-const int GPS_CA_TELEMETRY_RATE_SYMBOLS_SECOND = GPS_CA_TELEMETRY_RATE_BITS_SECOND*20;   //!< NAV message bit rate [symbols/s]
+const int GPS_CA_TELEMETRY_SYMBOLS_PER_BIT = 20;
+const int GPS_CA_TELEMETRY_RATE_SYMBOLS_SECOND = GPS_CA_TELEMETRY_RATE_BITS_SECOND*GPS_CA_TELEMETRY_SYMBOLS_PER_BIT;   //!< NAV message bit rate [symbols/s]
 const int GPS_WORD_LENGTH = 4;                      //!< CRC + GPS WORD (-2 -1 0 ... 29) Bits = 4 bytes
 const int GPS_SUBFRAME_LENGTH = 40;                 //!< GPS_WORD_LENGTH x 10 = 40 bytes
 const int GPS_SUBFRAME_BITS = 300;                  //!< Number of bits per subframe in the NAV message [bits]
 const int GPS_SUBFRAME_SECONDS = 6;                 //!< Subframe duration [seconds]
+const int GPS_SUBFRAME_MS = 6000;                 //!< Subframe duration [seconds]
 const int GPS_WORD_BITS = 30;                       //!< Number of bits per word in the NAV message [bits]
 
 // GPS NAVIGATION MESSAGE STRUCTURE

@@ -37,19 +37,15 @@
  */
 
 #ifndef GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_CC_H
-#define	GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_CC_H
+#define GNSS_SDR_GALILEO_E1_TCP_CONNECTOR_TRACKING_CC_H
 
 #include <fstream>
-#include <queue>
 #include <map>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
-#include "concurrent_queue.h"
+#include <volk/volk.h>
 #include "gnss_synchro.h"
-#include "correlator.h"
+#include "cpu_multicorrelator.h"
 #include "tcp_communication.h"
 
 
@@ -61,7 +57,6 @@ galileo_e1_tcp_connector_tracking_cc_sptr
 galileo_e1_tcp_connector_make_tracking_cc(long if_freq,
                                    long fs_in, unsigned
                                    int vector_length,
-                                   boost::shared_ptr<gr::msg_queue> queue,
                                    bool dump,
                                    std::string dump_filename,
                                    float pll_bw_hz,
@@ -82,7 +77,6 @@ public:
     void set_channel(unsigned int channel);
     void set_gnss_synchro(Gnss_Synchro* p_gnss_synchro);
     void start_tracking();
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
 
     int general_work (int noutput_items, gr_vector_int &ninput_items,
             gr_vector_const_void_star &input_items, gr_vector_void_star &output_items);
@@ -93,7 +87,6 @@ private:
     galileo_e1_tcp_connector_make_tracking_cc(long if_freq,
             long fs_in, unsigned
             int vector_length,
-            boost::shared_ptr<gr::msg_queue> queue,
             bool dump,
             std::string dump_filename,
             float pll_bw_hz,
@@ -105,7 +98,6 @@ private:
     Galileo_E1_Tcp_Connector_Tracking_cc(long if_freq,
             long fs_in, unsigned
             int vector_length,
-            boost::shared_ptr<gr::msg_queue> queue,
             bool dump,
             std::string dump_filename,
             float pll_bw_hz,
@@ -119,28 +111,21 @@ private:
     void update_local_carrier();
 
     // tracking configuration vars
-    boost::shared_ptr<gr::msg_queue> d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     unsigned int d_vector_length;
     bool d_dump;
 
     Gnss_Synchro* d_acquisition_gnss_synchro;
     unsigned int d_channel;
-    int d_last_seg;
+
     long d_if_freq;
     long d_fs_in;
 
+    int d_correlation_length_samples;
+    int d_n_correlator_taps;
     float d_early_late_spc_chips;
     float d_very_early_late_spc_chips;
 
     gr_complex* d_ca_code;
-
-    gr_complex* d_very_early_code;
-    gr_complex* d_early_code;
-    gr_complex* d_prompt_code;
-    gr_complex* d_late_code;
-    gr_complex* d_very_late_code;
-    gr_complex* d_carr_sign;
 
     gr_complex *d_Very_Early;
     gr_complex *d_Early;
@@ -158,7 +143,9 @@ private:
     float d_acq_carrier_doppler_hz;
 
     // correlator
-    Correlator d_correlator;
+    float* d_local_code_shift_chips;
+    gr_complex* d_correlator_outs;
+    cpu_multicorrelator multicorrelator_cpu;
 
     // tracking vars
     double d_code_freq_chips;
@@ -175,7 +162,6 @@ private:
     //PRN period in samples
     int d_current_prn_length_samples;
     int d_next_prn_length_samples;
-    //double d_sample_counter_seconds;
 
     //processing samples counters
     unsigned long int d_sample_counter;

@@ -20,22 +20,19 @@
 ########################################################################
 # Setup profiler
 ########################################################################
-if(Boost_FOUND)
-
 if(MSVC)
-    include_directories(${CMAKE_SOURCE_DIR}/cmake/msvc)
+    include_directories(${PROJECT_SOURCE_DIR}/cmake/msvc)
 endif(MSVC)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_BINARY_DIR}/include
-    ${CMAKE_SOURCE_DIR}/lib
-    ${CMAKE_BINARY_DIR}/lib
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_BINARY_DIR}/include
+    ${PROJECT_SOURCE_DIR}/lib
+    ${PROJECT_BINARY_DIR}/lib
     ${Boost_INCLUDE_DIRS}
 )
-
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    set(Clang_required_link "c++")
@@ -43,13 +40,26 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    set(Clang_required_link "")
 endif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
 
+if(ORC_FOUND)
+    set(orc_lib ${ORC_LIBRARIES})
+elseif(ORC_FOUND)
+    set(orc_lib "")
+endif(ORC_FOUND)
+
+
 # MAKE volk_gnsssdr_profile
 add_executable(volk_gnsssdr_profile
     ${CMAKE_CURRENT_SOURCE_DIR}/volk_gnsssdr_profile.cc
-    ${CMAKE_SOURCE_DIR}/lib/qa_utils.cc
+    ${PROJECT_SOURCE_DIR}/lib/qa_utils.cc
 )
 
-target_link_libraries(volk_gnsssdr_profile volk_gnsssdr ${Boost_LIBRARIES} ${Clang_required_link})
+if(ENABLE_STATIC_LIBS)
+    target_link_libraries(volk_gnsssdr_profile volk_gnsssdr_static ${Boost_LIBRARIES} ${Clang_required_link} ${orc_lib})
+else(ENABLE_STATIC_LIBS)
+    target_link_libraries(volk_gnsssdr_profile volk_gnsssdr ${Boost_LIBRARIES} ${Clang_required_link} ${orc_lib})
+    add_dependencies(volk_gnsssdr_profile volk_gnsssdr)
+endif(ENABLE_STATIC_LIBS)
+
 
 if(ENABLE_STRIP)
     if(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
@@ -58,15 +68,42 @@ if(ENABLE_STRIP)
     endif(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
 endif(ENABLE_STRIP)
 
+
 install(
     TARGETS volk_gnsssdr_profile
     DESTINATION bin
     COMPONENT "volk_gnsssdr"
 )
 
+# Launch volk_gnsssdr_profile if requested to do so
+if(ENABLE_PROFILING)
+   if(DEFINED VOLK_CONFIGPATH)
+        set( VOLK_CONFIG_ARG "-p${VOLK_CONFIGPATH}" )
+        set( VOLK_CONFIG "${VOLK_CONFIGPATH}/volk_gnsssdr_config" )
+   endif()
+   add_custom_command(OUTPUT ${VOLK_CONFIG}
+        COMMAND volk_gnsssdr_profile "${VOLK_CONFIG_ARG}"
+        DEPENDS volk_gnsssdr_profile
+        COMMENT "Launching profiler, this may take a few minutes..."
+    )
+    add_custom_target(volk-gnsssdr-profile-run ALL DEPENDS ${VOLK_CONFIG})
+endif()
+
 # MAKE volk_gnsssdr-config-info
 add_executable(volk_gnsssdr-config-info volk_gnsssdr-config-info.cc)
-target_link_libraries(volk_gnsssdr-config-info volk_gnsssdr ${Boost_LIBRARIES} ${Clang_required_link})
+if(ENABLE_STATIC_LIBS)
+   target_link_libraries(volk_gnsssdr-config-info volk_gnsssdr_static ${Boost_LIBRARIES} ${Clang_required_link} ${orc_lib})
+else(ENABLE_STATIC_LIBS)
+   target_link_libraries(volk_gnsssdr-config-info volk_gnsssdr ${Boost_LIBRARIES} ${Clang_required_link} ${orc_lib})
+   add_dependencies(volk_gnsssdr-config-info volk_gnsssdr)
+endif(ENABLE_STATIC_LIBS)
+
+if(ENABLE_STRIP)
+    if(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
+        set_target_properties(volk_gnsssdr-config-info
+                              PROPERTIES LINK_FLAGS "-s")
+    endif(CMAKE_COMPILER_IS_GNUCXX AND NOT WIN32)
+endif(ENABLE_STRIP)
 
 install(
     TARGETS volk_gnsssdr-config-info
@@ -74,4 +111,3 @@ install(
     COMPONENT "volk_gnsssdr"
 )
 
-endif(Boost_FOUND)

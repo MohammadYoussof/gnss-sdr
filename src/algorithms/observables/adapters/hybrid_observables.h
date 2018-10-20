@@ -1,7 +1,7 @@
 /*!
  * \file hybrid_observables.h
- * \brief Implementation of an adapter of a Galileo E1 observables block
- * to a ObservablesInterface
+ * \brief Implementation of an adapter of an observables block accepting all kind
+ * of signals to a ObservablesInterface
  * \author Mara Branzanti 2013. mara.branzanti(at)gmail.com
  * \author Javier Arribas 2013. jarribas(at)cttc.es
  *
@@ -31,11 +31,10 @@
  */
 
 
-#ifndef GNSS_SDR_hybrid_observables_H_
-#define GNSS_SDR_hybrid_observables_H_
+#ifndef GNSS_SDR_HYBRID_OBSERVABLES_H_
+#define GNSS_SDR_HYBRID_OBSERVABLES_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "observables_interface.h"
 #include "hybrid_observables_cc.h"
 
@@ -43,16 +42,15 @@
 class ConfigurationInterface;
 
 /*!
- * \brief This class implements an ObservablesInterface for Galileo E1B
+ * \brief This class implements an ObservablesInterface for observables of all kind of GNSS signals
  */
 class HybridObservables : public ObservablesInterface
 {
 public:
-	HybridObservables(ConfigurationInterface* configuration,
-                       std::string role,
-                       unsigned int in_streams,
-                       unsigned int out_streams,
-                       boost::shared_ptr<gr::msg_queue> queue);
+    HybridObservables(ConfigurationInterface* configuration,
+            std::string role,
+            unsigned int in_streams,
+            unsigned int out_streams);
     virtual ~HybridObservables();
     std::string role()
     {
@@ -82,12 +80,10 @@ public:
 private:
     hybrid_observables_cc_sptr observables_;
     bool dump_;
-    unsigned int fs_in_;
     std::string dump_filename_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
 };
 
 #endif

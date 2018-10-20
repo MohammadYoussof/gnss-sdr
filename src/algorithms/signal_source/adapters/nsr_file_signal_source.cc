@@ -45,13 +45,13 @@
 using google::LogMessage;
 
 DEFINE_string(nsr_signal_source, "-",
-		"If defined, path to the file containing the NSR (byte to 2-bit packed) signal samples (overrides the configuration file)");
+        "If defined, path to the file containing the NSR (byte to 2-bit packed) signal samples (overrides the configuration file)");
 
 
 NsrFileSignalSource::NsrFileSignalSource(ConfigurationInterface* configuration,
         std::string role, unsigned int in_streams, unsigned int out_streams,
         boost::shared_ptr<gr::msg_queue> queue) :
-		                role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
+                        role_(role), in_streams_(in_streams), out_streams_(out_streams), queue_(queue)
 {
     std::string default_filename = "../data/my_capture.dat";
     std::string default_item_type = "byte";
@@ -114,7 +114,7 @@ NsrFileSignalSource::NsrFileSignalSource(ConfigurationInterface* configuration,
         {
             /*!
              * BUG workaround: The GNU Radio file source does not stop the receiver after reaching the End of File.
-             * A possible solution is to compute the file length in samples using file size, excluding the last 100 milliseconds, and enable always the
+             * A possible solution is to compute the file length in samples using file size, excluding the last 2 milliseconds, and enable always the
              * valve block
              */
             std::ifstream file (filename_.c_str(), std::ios::in | std::ios::binary | std::ios::ate);
@@ -130,8 +130,10 @@ NsrFileSignalSource::NsrFileSignalSource(ConfigurationInterface* configuration,
                     std::cout << "file_signal_source: Unable to open the samples file " << filename_.c_str() << std::endl;
                     LOG(ERROR) << "file_signal_source: Unable to open the samples file " << filename_.c_str();
                 }
+            std::streamsize ss = std::cout.precision();
             std::cout << std::setprecision(16);
             std::cout << "Processing file " << filename_ << ", which contains " << (double)size << " [bytes]" << std::endl;
+            std::cout.precision (ss);
 
             if (size > 0)
                 {

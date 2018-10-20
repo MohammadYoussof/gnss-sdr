@@ -29,33 +29,28 @@
  */
 
 #ifndef GNSS_SDR_GALILEO_E1_PVT_CC_H
-#define	GNSS_SDR_GALILEO_E1_PVT_CC_H
+#define GNSS_SDR_GALILEO_E1_PVT_CC_H
 
 #include <fstream>
-#include <queue>
-#include <utility>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <utility>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
-#include "galileo_navigation_message.h"
-#include "galileo_ephemeris.h"
-#include "galileo_utc_model.h"
-#include "galileo_iono.h"
 #include "nmea_printer.h"
 #include "kml_printer.h"
 #include "rinex_printer.h"
+#include "geojson_printer.h"
+#include "rtcm_printer.h"
 #include "galileo_e1_ls_pvt.h"
-#include "GPS_L1_CA.h"
-#include "Galileo_E1.h"
+
 
 class galileo_e1_pvt_cc;
 
 typedef boost::shared_ptr<galileo_e1_pvt_cc> galileo_e1_pvt_cc_sptr;
 
 galileo_e1_pvt_cc_sptr galileo_e1_make_pvt_cc(unsigned int n_channels,
-                                              boost::shared_ptr<gr::msg_queue> queue,
                                               bool dump,
                                               std::string dump_filename,
                                               int averaging_depth,
@@ -64,7 +59,13 @@ galileo_e1_pvt_cc_sptr galileo_e1_make_pvt_cc(unsigned int n_channels,
                                               int display_rate_ms,
                                               bool flag_nmea_tty_port,
                                               std::string nmea_dump_filename,
-                                              std::string nmea_dump_devname);
+                                              std::string nmea_dump_devname,
+                                              bool flag_rtcm_server,
+                                              bool flag_rtcm_tty_port,
+                                              unsigned short rtcm_tcp_port,
+                                              unsigned short rtcm_station_id,
+                                              std::map<int,int> rtcm_msg_rate_ms,
+                                              std::string rtcm_dump_devname);
 
 /*!
  * \brief This class implements a block that computes the PVT solution with Galileo E1 signals
@@ -73,7 +74,6 @@ class galileo_e1_pvt_cc : public gr::block
 {
 private:
     friend galileo_e1_pvt_cc_sptr galileo_e1_make_pvt_cc(unsigned int nchannels,
-                                                         boost::shared_ptr<gr::msg_queue> queue,
                                                          bool dump,
                                                          std::string dump_filename,
                                                          int averaging_depth,
@@ -82,9 +82,14 @@ private:
                                                          int display_rate_ms,
                                                          bool flag_nmea_tty_port,
                                                          std::string nmea_dump_filename,
-                                                         std::string nmea_dump_devname);
+                                                         std::string nmea_dump_devname,
+                                                         bool flag_rtcm_server,
+                                                         bool flag_rtcm_tty_port,
+                                                         unsigned short rtcm_tcp_port,
+                                                         unsigned short rtcm_station_id,
+                                                         std::map<int,int> rtcm_msg_rate_ms,
+                                                         std::string rtcm_dump_devname);
     galileo_e1_pvt_cc(unsigned int nchannels,
-                      boost::shared_ptr<gr::msg_queue> queue,
                       bool dump, std::string dump_filename,
                       int averaging_depth,
                       bool flag_averaging,
@@ -92,11 +97,24 @@ private:
                       int display_rate_ms,
                       bool flag_nmea_tty_port,
                       std::string nmea_dump_filename,
-                      std::string nmea_dump_devname);
-    boost::shared_ptr<gr::msg_queue> d_queue;
+                      std::string nmea_dump_devname,
+                      bool flag_rtcm_server,
+                      bool flag_rtcm_tty_port,
+                      unsigned short rtcm_tcp_port,
+                      unsigned short rtcm_station_id,
+                      std::map<int,int> rtcm_msg_rate_ms,
+                      std::string rtcm_dump_devname);
+
+    void msg_handler_telemetry(pmt::pmt_t msg);
+
     bool d_dump;
-    bool b_rinex_header_writen;
-    std::shared_ptr<Rinex_Printer> rp;
+    bool b_rinex_header_written;
+    bool b_rinex_header_updated;
+    bool b_rtcm_writing_started;
+
+    void print_receiver_status(Gnss_Synchro** channels_synchronization_data);
+    int d_last_status_print_seg; //for status printer
+
     unsigned int d_nchannels;
     std::string d_dump_filename;
     std::ofstream d_dump_file;
@@ -106,11 +124,26 @@ private:
     int d_display_rate_ms;
     long unsigned int d_sample_counter;
     long unsigned int d_last_sample_nav_output;
+    int d_rtcm_MT1045_rate_ms;
+    int d_rtcm_MSM_rate_ms;
+
+    std::shared_ptr<Rinex_Printer> rp;
     std::shared_ptr<Kml_Printer> d_kml_dump;
     std::shared_ptr<Nmea_Printer> d_nmea_printer;
+    std::shared_ptr<GeoJSON_Printer> d_geojson_printer;
+    std::shared_ptr<Rtcm_Printer> d_rtcm_printer;
+
     double d_rx_time;
     std::shared_ptr<galileo_e1_ls_pvt> d_ls_pvt;
-    bool pseudoranges_pairCompare_min(std::pair<int,Gnss_Synchro> a, std::pair<int,Gnss_Synchro> b);
+
+    bool first_fix;
+    key_t sysv_msg_key;
+    int sysv_msqid;
+    typedef struct  {
+        long mtype;//required by sys v message
+        double ttff;
+    } ttff_msgbuf;
+    bool send_sys_v_ttff_msg(ttff_msgbuf ttff);
 
 public:
     ~galileo_e1_pvt_cc (); //!< Default destructor

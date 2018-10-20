@@ -32,10 +32,20 @@
  */
 
 #include "gnss_sdr_supl_client.h"
+#include <cmath>
 #include <utility>
 
 gnss_sdr_supl_client::gnss_sdr_supl_client()
-{}
+{
+    mcc = 0;
+    mns = 0;
+    lac = 0;
+    ci = 0;
+    supl_ctx_new(&ctx);
+    assist = supl_assist_t();
+    server_port = 0;
+    request = 0;
+}
 
 gnss_sdr_supl_client::~gnss_sdr_supl_client()
 {}
@@ -45,7 +55,7 @@ void gnss_sdr_supl_client::print_assistance()
     if (assist.set & SUPL_RRLP_ASSIST_REFTIME)
         {
             fprintf(stdout, "T %ld %ld %ld %ld\n", assist.time.gps_week, assist.time.gps_tow,
-                    assist.time.stamp.tv_sec, assist.time.stamp.tv_usec);
+                    assist.time.stamp.tv_sec, static_cast<long>(assist.time.stamp.tv_usec));
         }
 
     if (assist.set & SUPL_RRLP_ASSIST_UTC)
@@ -362,11 +372,11 @@ bool gnss_sdr_supl_client::load_ephemeris_xml(const std::string file_name)
             gps_ephemeris_map.clear();
             xml >> boost::serialization::make_nvp("GNSS-SDR_ephemeris_map", this->gps_ephemeris_map);
             ifs.close();
-            LOG(INFO) << "Loaded Ephemeris map data";
+            LOG(INFO) << "Loaded Ephemeris map data with "<<this->gps_ephemeris_map.size()<<" satellites";
     }
     catch (std::exception& e)
     {
-            LOG(ERROR) << e.what() << "File: " << file_name;
+            LOG(WARNING) << e.what() << "File: " << file_name;
             return false;
     }
     return true;
@@ -386,7 +396,7 @@ bool gnss_sdr_supl_client::save_ephemeris_map_xml(const std::string file_name, s
                 }
             catch (std::exception& e)
                 {
-                    LOG(ERROR) << e.what();
+                    LOG(WARNING) << e.what();
                     return false;
                 }
             return true;
@@ -410,7 +420,7 @@ bool gnss_sdr_supl_client::load_utc_xml(const std::string file_name)
     }
     catch (std::exception& e)
     {
-        LOG(ERROR) << e.what() << "File: " << file_name;
+        LOG(WARNING) << e.what() << "File: " << file_name;
         return false;
     }
     return true;
@@ -430,7 +440,7 @@ bool gnss_sdr_supl_client::save_utc_map_xml(const std::string file_name, std::ma
                 }
             catch (std::exception& e)
                 {
-                    LOG(ERROR) << e.what();
+                    LOG(WARNING) << e.what();
                     return false;
                 }
             return true;
@@ -454,7 +464,7 @@ bool gnss_sdr_supl_client::load_iono_xml(const std::string file_name)
         }
     catch (std::exception& e)
         {
-            LOG(ERROR) << e.what() << "File: " << file_name;
+            LOG(WARNING) << e.what() << "File: " << file_name;
             return false;
         }
     return true;
@@ -474,7 +484,7 @@ bool gnss_sdr_supl_client::save_iono_map_xml(const std::string file_name, std::m
                 }
             catch (std::exception& e)
                 {
-                    LOG(ERROR) << e.what();
+                    LOG(WARNING) << e.what();
                     return false;
                 }
             return true;
@@ -498,7 +508,7 @@ bool gnss_sdr_supl_client::load_ref_time_xml(const std::string file_name)
     }
     catch (std::exception& e)
     {
-        LOG(ERROR) << e.what() << "File: " << file_name;
+        LOG(WARNING) << e.what() << "File: " << file_name;
         return false;
     }
     return true;
@@ -518,7 +528,7 @@ bool gnss_sdr_supl_client::save_ref_time_map_xml(const std::string file_name, st
                 }
             catch (std::exception& e)
                 {
-                    LOG(ERROR) << e.what();
+                    LOG(WARNING) << e.what();
                     return false;
                 }
             return true;
@@ -542,7 +552,7 @@ bool gnss_sdr_supl_client::load_ref_location_xml(const std::string file_name)
     }
     catch (std::exception& e)
     {
-            LOG(ERROR) << e.what() << "File: " << file_name;
+            LOG(WARNING) << e.what() << "File: " << file_name;
             return false;
     }
     return true;
@@ -562,7 +572,7 @@ bool gnss_sdr_supl_client::save_ref_location_map_xml(const std::string file_name
                 }
             catch (std::exception& e)
                 {
-                    LOG(ERROR) << e.what();
+                    LOG(WARNING) << e.what();
                     return false;
                 }
             return true;

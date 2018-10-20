@@ -39,8 +39,9 @@
 #include <glog/logging.h>
 #include <gnuradio/io_signature.h>
 #include <volk/volk.h>
-#include "gnss_signal_processing.h"
+#include <volk_gnsssdr/volk_gnsssdr.h>
 #include "control_message_factory.h"
+#include "GPS_L1_CA.h" //GPS_TWO_PI
 
 
 using google::LogMessage;
@@ -49,30 +50,26 @@ pcps_cccwsr_acquisition_cc_sptr pcps_cccwsr_make_acquisition_cc(
                                 unsigned int sampled_ms, unsigned int max_dwells,
                                 unsigned int doppler_max, long freq, long fs_in,
                                 int samples_per_ms, int samples_per_code,
-                                gr::msg_queue::sptr queue, bool dump,
-                                std::string dump_filename)
-
+                                bool dump, std::string dump_filename)
 {
-
     return pcps_cccwsr_acquisition_cc_sptr(
             new pcps_cccwsr_acquisition_cc(sampled_ms, max_dwells, doppler_max, freq, fs_in,
-                    samples_per_ms, samples_per_code, queue, dump, dump_filename));
+                    samples_per_ms, samples_per_code, dump, dump_filename));
 }
 
 pcps_cccwsr_acquisition_cc::pcps_cccwsr_acquisition_cc(
                     unsigned int sampled_ms, unsigned int max_dwells,
                     unsigned int doppler_max, long freq, long fs_in,
                     int samples_per_ms, int samples_per_code,
-                    gr::msg_queue::sptr queue, bool dump,
-                    std::string dump_filename) :
+                    bool dump, std::string dump_filename) :
     gr::block("pcps_cccwsr_acquisition_cc",
     gr::io_signature::make(1, 1, sizeof(gr_complex) * sampled_ms * samples_per_ms),
     gr::io_signature::make(0, 0, sizeof(gr_complex) * sampled_ms * samples_per_ms))
 {
+    this->message_port_register_out(pmt::mp("events"));
     d_sample_counter = 0;    // SAMPLE COUNTER
     d_active = false;
     d_state = 0;
-    d_queue = queue;
     d_freq = freq;
     d_fs_in = fs_in;
     d_samples_per_ms = samples_per_ms;
@@ -86,13 +83,13 @@ pcps_cccwsr_acquisition_cc::pcps_cccwsr_acquisition_cc(
     d_input_power = 0.0;
     d_num_doppler_bins = 0;
 
-    d_fft_code_data = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_fft_code_pilot = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_data_correlation = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_pilot_correlation = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_correlation_plus = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_correlation_minus = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
-    d_magnitude = static_cast<float*>(volk_malloc(d_fft_size * sizeof(float), volk_get_alignment()));
+    d_fft_code_data = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_fft_code_pilot = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_data_correlation = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_pilot_correlation = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_correlation_plus = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_correlation_minus = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
+    d_magnitude = static_cast<float*>(volk_gnsssdr_malloc(d_fft_size * sizeof(float), volk_gnsssdr_get_alignment()));
 
     // Direct FFT
     d_fft_if = new gr::fft::fft_complex(d_fft_size, true);
@@ -103,6 +100,16 @@ pcps_cccwsr_acquisition_cc::pcps_cccwsr_acquisition_cc(
     // For dumping samples into a file
     d_dump = dump;
     d_dump_filename = dump_filename;
+
+    d_doppler_resolution = 0;
+    d_threshold = 0;
+    d_doppler_step = 0;
+    d_grid_doppler_wipeoffs = 0;
+    d_gnss_synchro = 0;
+    d_code_phase = 0;
+    d_doppler_freq = 0;
+    d_test_statistics = 0;
+    d_channel = 0;
 }
 
 pcps_cccwsr_acquisition_cc::~pcps_cccwsr_acquisition_cc()
@@ -111,18 +118,18 @@ pcps_cccwsr_acquisition_cc::~pcps_cccwsr_acquisition_cc()
         {
             for (unsigned int i = 0; i < d_num_doppler_bins; i++)
                 {
-                    volk_free(d_grid_doppler_wipeoffs[i]);
+                    volk_gnsssdr_free(d_grid_doppler_wipeoffs[i]);
                 }
             delete[] d_grid_doppler_wipeoffs;
         }
 
-    volk_free(d_fft_code_data);
-    volk_free(d_fft_code_pilot);
-    volk_free(d_data_correlation);
-    volk_free(d_pilot_correlation);
-    volk_free(d_correlation_plus);
-    volk_free(d_correlation_minus);
-    volk_free(d_magnitude);
+    volk_gnsssdr_free(d_fft_code_data);
+    volk_gnsssdr_free(d_fft_code_pilot);
+    volk_gnsssdr_free(d_data_correlation);
+    volk_gnsssdr_free(d_pilot_correlation);
+    volk_gnsssdr_free(d_correlation_plus);
+    volk_gnsssdr_free(d_correlation_minus);
+    volk_gnsssdr_free(d_magnitude);
 
     delete d_ifft;
     delete d_fft_if;
@@ -155,6 +162,12 @@ void pcps_cccwsr_acquisition_cc::set_local_code(std::complex<float>* code_data,
 
 void pcps_cccwsr_acquisition_cc::init()
 {
+    d_gnss_synchro->Flag_valid_acquisition = false;
+    d_gnss_synchro->Flag_valid_symbol_output = false;
+    d_gnss_synchro->Flag_valid_pseudorange = false;
+    d_gnss_synchro->Flag_valid_word = false;
+    d_gnss_synchro->Flag_preamble = false;
+
     d_gnss_synchro->Acq_delay_samples = 0.0;
     d_gnss_synchro->Acq_doppler_hz = 0.0;
     d_gnss_synchro->Acq_samplestamp_samples = 0;
@@ -174,17 +187,42 @@ void pcps_cccwsr_acquisition_cc::init()
     d_grid_doppler_wipeoffs = new gr_complex*[d_num_doppler_bins];
     for (unsigned int doppler_index = 0; doppler_index < d_num_doppler_bins; doppler_index++)
         {
-            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_malloc(d_fft_size * sizeof(gr_complex), volk_get_alignment()));
+            d_grid_doppler_wipeoffs[doppler_index] = static_cast<gr_complex*>(volk_gnsssdr_malloc(d_fft_size * sizeof(gr_complex), volk_gnsssdr_get_alignment()));
 
             int doppler = -static_cast<int>(d_doppler_max) + d_doppler_step * doppler_index;
-            complex_exp_gen_conj(d_grid_doppler_wipeoffs[doppler_index],
-                                 d_freq + doppler, d_fs_in, d_fft_size);
+            float phase_step_rad = GPS_TWO_PI * (d_freq + doppler) / static_cast<float>(d_fs_in);
+            float _phase[1];
+            _phase[0] = 0;
+            volk_gnsssdr_s32f_sincos_32fc(d_grid_doppler_wipeoffs[doppler_index], - phase_step_rad, _phase, d_fft_size);
         }
 }
 
+
+void pcps_cccwsr_acquisition_cc::set_state(int state)
+{
+    d_state = state;
+    if (d_state == 1)
+        {
+            d_gnss_synchro->Acq_delay_samples = 0.0;
+            d_gnss_synchro->Acq_doppler_hz = 0.0;
+            d_gnss_synchro->Acq_samplestamp_samples = 0;
+            d_well_count = 0;
+            d_mag = 0.0;
+            d_input_power = 0.0;
+            d_test_statistics = 0.0;
+        }
+    else if (d_state == 0)
+        {}
+    else
+        {
+            LOG(ERROR) << "State can only be set to 0 or 1";
+        }
+}
+
+
 int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
         gr_vector_int &ninput_items, gr_vector_const_void_star &input_items,
-        gr_vector_void_star &output_items)
+        gr_vector_void_star &output_items __attribute__((unused)))
 {
 
     int acquisition_message = -1; //0=STOP_CHANNEL 1=ACQ_SUCCEES 2=ACQ_FAIL
@@ -216,9 +254,10 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
         {
             // initialize acquisition algorithm
             int doppler;
-            unsigned int indext = 0;
-            unsigned int indext_plus = 0;
-            unsigned int indext_minus = 0;
+
+            uint32_t indext = 0;
+            uint32_t indext_plus = 0;
+            uint32_t indext_minus = 0;
             float magt = 0.0;
             float magt_plus = 0.0;
             float magt_minus = 0.0;
@@ -292,11 +331,11 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
                         }
 
                     volk_32fc_magnitude_squared_32f(d_magnitude, d_correlation_plus, d_fft_size);
-                    volk_32f_index_max_16u(&indext_plus, d_magnitude, d_fft_size);
+                    volk_gnsssdr_32f_index_max_32u(&indext_plus, d_magnitude, d_fft_size);
                     magt_plus = d_magnitude[indext_plus] / (fft_normalization_factor * fft_normalization_factor);
 
                     volk_32fc_magnitude_squared_32f(d_magnitude, d_correlation_minus, d_fft_size);
-                    volk_32f_index_max_16u(&indext_minus, d_magnitude, d_fft_size);
+                    volk_gnsssdr_32f_index_max_32u(&indext_minus, d_magnitude, d_fft_size);
                     magt_minus = d_magnitude[indext_minus] / (fft_normalization_factor * fft_normalization_factor);
 
                     if (magt_plus >= magt_minus)
@@ -338,7 +377,7 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
             //d_test_statistics = 2 * d_fft_size * d_mag / d_input_power;
             d_test_statistics = d_mag / d_input_power;
 
-            // 6- Declare positive or negative acquisition using a message queue
+            // 6- Declare positive or negative acquisition using a message port
             if (d_test_statistics > d_threshold)
                 {
                     d_state = 2; // Positive acquisition
@@ -355,7 +394,7 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
 
     case 2:
         {
-            // 6.1- Declare positive acquisition using a message queue
+            // 6.1- Declare positive acquisition using a message port
             DLOG(INFO) << "positive acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -373,14 +412,14 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
             consume_each(ninput_items[0]);
 
             acquisition_message = 1;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
 
     case 3:
         {
-            // 6.2- Declare negative acquisition using a message queue
+            // 6.2- Declare negative acquisition using a message port
             DLOG(INFO) << "negative acquisition";
             DLOG(INFO) << "satellite " << d_gnss_synchro->System << " " << d_gnss_synchro->PRN;
             DLOG(INFO) << "sample_stamp " << d_sample_counter;
@@ -398,11 +437,11 @@ int pcps_cccwsr_acquisition_cc::general_work(int noutput_items,
             consume_each(ninput_items[0]);
 
             acquisition_message = 2;
-            d_channel_internal_queue->push(acquisition_message);
+            this->message_port_pub(pmt::mp("events"), pmt::from_long(acquisition_message));
 
             break;
         }
     }
 
-    return 0;
+    return noutput_items;
 }

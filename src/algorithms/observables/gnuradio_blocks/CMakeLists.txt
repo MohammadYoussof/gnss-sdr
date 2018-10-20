@@ -30,12 +30,14 @@ include_directories(
      ${CMAKE_SOURCE_DIR}/src/algorithms/libs
      ${CMAKE_SOURCE_DIR}/src/algorithms/PVT/libs
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
+     ${ARMADILLO_INCLUDE_DIRS}
      ${GLOG_INCLUDE_DIRS}
      ${GFlags_INCLUDE_DIRS}
 )
 
 file(GLOB OBS_GR_BLOCKS_HEADERS "*.h")
+list(SORT OBS_GR_BLOCKS_HEADERS)
 add_library(obs_gr_blocks ${OBS_GR_BLOCKS_SOURCES} ${OBS_GR_BLOCKS_HEADERS})
 source_group(Headers FILES ${OBS_GR_BLOCKS_HEADERS})
-add_dependencies(obs_gr_blocks glog-${glog_RELEASE})
-target_link_libraries(obs_gr_blocks ${GNURADIO_RUNTIME_LIBRARIES})
+add_dependencies(obs_gr_blocks glog-${glog_RELEASE} armadillo-${armadillo_RELEASE})
+target_link_libraries(obs_gr_blocks ${GNURADIO_RUNTIME_LIBRARIES} ${ARMADILLO_LIBRARIES})

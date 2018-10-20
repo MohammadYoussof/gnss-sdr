@@ -33,17 +33,7 @@
 #define GNSS_SDR_GPS_L1_CA_SUBFRAME_FSM_H_
 
 #include <boost/statechart/state_machine.hpp>
-#include <boost/statechart/simple_state.hpp>
-#include <boost/statechart/state.hpp>
-#include <boost/statechart/transition.hpp>
-#include <boost/statechart/custom_reaction.hpp>
-#include <boost/mpl/list.hpp>
-#include <queue>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include "concurrent_queue.h"
-#include <iostream>
-#include <cstring>
 #include "GPS_L1_CA.h"
 #include "gps_navigation_message.h"
 #include "gps_ephemeris.h"
@@ -76,15 +66,10 @@ class GpsL1CaSubframeFsm : public sc::state_machine< GpsL1CaSubframeFsm, gps_sub
 {
 public:
     GpsL1CaSubframeFsm(); //!< The constructor starts the Finite State Machine
-
+    void clear_flag_new_subframe();
     // channel and satellite info
     int i_channel_ID;              //!< Channel id
     unsigned int i_satellite_PRN;  //!< Satellite PRN number
-
-    concurrent_queue<Gps_Ephemeris> *d_ephemeris_queue; //!< Ephemeris queue
-    concurrent_queue<Gps_Iono> *d_iono_queue;           //!< Ionospheric parameters queue
-    concurrent_queue<Gps_Utc_Model> *d_utc_model_queue; //!< UTC model parameters queue
-    concurrent_queue<Gps_Almanac> *d_almanac_queue;     //!< Almanac queue
 
     Gps_Navigation_Message d_nav; //!< GPS L1 C/A navigation message object
 
@@ -95,6 +80,8 @@ public:
     Gps_Iono iono;            //!< Object that handles ionospheric parameters
 
     char d_subframe[GPS_SUBFRAME_LENGTH];
+    int d_subframe_ID;
+    bool d_flag_new_subframe;
     char d_GPS_frame_4bytes[GPS_WORD_LENGTH];
     double d_preamble_time_ms;
 

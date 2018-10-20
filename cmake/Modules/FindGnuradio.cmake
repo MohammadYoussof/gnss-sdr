@@ -66,17 +66,39 @@ function(GR_MODULE EXTVAR PCNAME INCFILE LIBFILE)
     foreach(libname ${PC_GNURADIO_${EXTVAR}_LIBRARIES})
         FIND_LIBRARY(
             ${LIBVAR_NAME}_${libname}
-            NAMES ${libname}
+            NAMES ${libname} ${libname}-${PC_GNURADIO_RUNTIME_VERSION}
             HINTS $ENV{GNURADIO_RUNTIME_DIR}/lib
                 ${PC_LIBDIR}
                 ${CMAKE_INSTALL_PREFIX}/lib/
                 ${CMAKE_INSTALL_PREFIX}/lib64/
                 ${GNURADIO_INSTALL_PREFIX}/lib/
-                 ${GNURADIO_INSTALL_PREFIX}/lib64
+                ${GNURADIO_INSTALL_PREFIX}/lib64
             PATHS /usr/local/lib
-                  /usr/local/lib64
-                  /usr/lib
+                  /usr/lib/x86_64-linux-gnu
+                  /usr/lib/i386-linux-gnu
+                  /usr/lib/arm-linux-gnueabihf
+                  /usr/lib/arm-linux-gnueabi
+                  /usr/lib/aarch64-linux-gnu
+                  /usr/lib/mipsel-linux-gnu
+                  /usr/lib/mips-linux-gnu
+                  /usr/lib/mips64el-linux-gnuabi64
+                  /usr/lib/powerpc-linux-gnu
+                  /usr/lib/powerpc64-linux-gnu
+                  /usr/lib/powerpc64le-linux-gnu
+                  /usr/lib/powerpc-linux-gnuspe
+                  /usr/lib/hppa-linux-gnu
+                  /usr/lib/s390x-linux-gnu
+                  /usr/lib/i386-gnu
+                  /usr/lib/hppa-linux-gnu
+                  /usr/lib/x86_64-kfreebsd-gnu
+                  /usr/lib/i386-kfreebsd-gnu
+                  /usr/lib/m68k-linux-gnu
+                  /usr/lib/sh4-linux-gnu
+                  /usr/lib/sparc64-linux-gnu
+                  /usr/lib/x86_64-linux-gnux32
+                  /usr/lib/alpha-linux-gnu
                   /usr/lib64
+                  /usr/lib
                   ${GNURADIO_INSTALL_PREFIX}/lib
         )
 	list(APPEND ${LIBVAR_NAME} ${${LIBVAR_NAME}_${libname}})
@@ -107,7 +129,6 @@ endfunction()
 
 GR_MODULE(RUNTIME gnuradio-runtime gnuradio/top_block.h gnuradio-runtime)
 GR_MODULE(ANALOG gnuradio-analog gnuradio/analog/api.h gnuradio-analog)
-GR_MODULE(ATSC gnuradio-atsc gnuradio/atsc/api.h gnuradio-atsc)
 GR_MODULE(AUDIO gnuradio-audio gnuradio/audio/api.h gnuradio-audio)
 GR_MODULE(BLOCKS gnuradio-blocks gnuradio/blocks/api.h gnuradio-blocks)
 GR_MODULE(CHANNELS gnuradio-channels gnuradio/channels/api.h gnuradio-channels)
@@ -128,3 +149,19 @@ GR_MODULE(PMT gnuradio-runtime pmt/pmt.h gnuradio-pmt)
 
 list(REMOVE_DUPLICATES GNURADIO_ALL_INCLUDE_DIRS)
 list(REMOVE_DUPLICATES GNURADIO_ALL_LIBRARIES)
+
+ # Trick to find out that GNU Radio is >= 3.7.4 if pkgconfig is not present
+if(NOT PC_GNURADIO_RUNTIME_VERSION)
+    find_file(GNURADIO_VERSION_GREATER_THAN_373
+              NAMES gnuradio/blocks/tsb_vector_sink_f.h
+              HINTS $ENV{GNURADIO_RUNTIME_DIR}/include
+                    ${CMAKE_INSTALL_PREFIX}/include
+                    ${GNURADIO_INSTALL_PREFIX}/include
+              PATHS /usr/local/include
+                    /usr/include
+                    ${GNURADIO_INSTALL_PREFIX}/include
+              )
+     if(GNURADIO_VERSION_GREATER_THAN_373)
+         set(PC_GNURADIO_RUNTIME_VERSION "3.7.4+")
+     endif(GNURADIO_VERSION_GREATER_THAN_373)
+endif(NOT PC_GNURADIO_RUNTIME_VERSION)

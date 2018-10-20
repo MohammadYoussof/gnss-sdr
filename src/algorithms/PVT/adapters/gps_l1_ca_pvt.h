@@ -37,7 +37,6 @@
 #define GNSS_SDR_GPS_L1_CA_PVT_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "pvt_interface.h"
 #include "gps_l1_ca_pvt_cc.h"
 
@@ -53,8 +52,7 @@ public:
     GpsL1CaPvt(ConfigurationInterface* configuration,
             std::string role,
             unsigned int in_streams,
-            unsigned int out_streams,
-            boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GpsL1CaPvt();
 
@@ -88,12 +86,13 @@ public:
 private:
     gps_l1_ca_pvt_cc_sptr pvt_;
     bool dump_;
-    unsigned int fs_in_;
     std::string dump_filename_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
+    
+    std::string eph_xml_filename_;
+    bool save_assistance_to_XML();
 };
 
 #endif

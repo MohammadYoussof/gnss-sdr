@@ -1,6 +1,6 @@
 /*!
  * \file constants.h
- * \brief volk_gnsssdr constants
+ * \brief Definition of VOLK_GNSSSDR-related constants
  * \author Andres Cecilia, 2014. a.cecilia.luque(at)gmail.com
  *
  * Copyright (C) 2010-2015 (see AUTHORS file for a list of contributors)
@@ -21,20 +21,19 @@
  * along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GNSS_SDR_VOLK_GNSSSDR_CONSTANTS_H
-#define GNSS_SDR_VOLK_GNSSSDR_CONSTANTS_H
+#ifndef INCLUDED_VOLK_GNSSSDR_CONSTANTS_H
+#define INCLUDED_VOLK_GNSSSDR_CONSTANTS_H
 
 #include <volk_gnsssdr/volk_gnsssdr_common.h>
 
 __VOLK_DECL_BEGIN
 
-VOLK_API char* volk_gnsssdr_prefix();
-VOLK_API char* volk_gnsssdr_build_date();
-VOLK_API char* volk_gnsssdr_version();
-VOLK_API char* volk_gnsssdr_c_compiler();
-VOLK_API char* volk_gnsssdr_compiler_flags();
-VOLK_API char* volk_gnsssdr_available_machines();
+VOLK_API const char* volk_gnsssdr_prefix();
+VOLK_API const char* volk_gnsssdr_version();
+VOLK_API const char* volk_gnsssdr_c_compiler();
+VOLK_API const char* volk_gnsssdr_compiler_flags();
+VOLK_API const char* volk_gnsssdr_available_machines();
 
 __VOLK_DECL_END
 
-#endif /* GNSS_SDR_VOLK_GNSSSDR_CONSTANTS_H */
+#endif /* INCLUDED_VOLK_GNSSSDR_CONSTANTS_H */

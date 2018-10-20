@@ -19,13 +19,16 @@
 add_definitions( -DGNSS_SDR_VERSION="${VERSION}" )
 
 set(PVT_LIB_SOURCES 
+     pvt_solution.cc
+     ls_pvt.cc
      gps_l1_ca_ls_pvt.cc
      galileo_e1_ls_pvt.cc
      hybrid_ls_pvt.cc
      kml_printer.cc
      rinex_printer.cc
      nmea_printer.cc  
-     rtcm_printer.cc  
+     rtcm_printer.cc
+     geojson_printer.cc
 )
 
 include_directories(
@@ -40,6 +43,7 @@ include_directories(
      ${GLOG_INCLUDE_DIRS}
 )
 file(GLOB PVT_LIB_HEADERS "*.h")
+list(SORT PVT_LIB_HEADERS)
 add_library(pvt_lib ${PVT_LIB_SOURCES} ${PVT_LIB_HEADERS})
 source_group(Headers FILES ${PVT_LIB_HEADERS})
 add_dependencies(pvt_lib armadillo-${armadillo_RELEASE} glog-${glog_RELEASE})

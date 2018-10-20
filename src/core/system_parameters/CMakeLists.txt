@@ -37,6 +37,11 @@ set(SYSTEM_PARAMETERS_SOURCES
 	 sbas_satellite_correction.cc
 	 sbas_telemetry_data.cc
 	 galileo_fnav_message.cc
+	 gps_cnav_ephemeris.cc
+	 gps_cnav_navigation_message.cc
+	 gps_cnav_iono.cc
+	 gps_cnav_utc_model.cc
+	 rtcm.cc
 )
 
 
@@ -50,6 +55,7 @@ include_directories(
 
 link_directories(${Boost_LIBRARY_DIR})
 file(GLOB SYSTEM_PARAMETERS_HEADERS "*.h")
+list(SORT SYSTEM_PARAMETERS_HEADERS)
 add_library(gnss_system_parameters ${SYSTEM_PARAMETERS_SOURCES} ${SYSTEM_PARAMETERS_HEADERS})
 source_group(Headers FILES ${SYSTEM_PARAMETERS_HEADERS})
 add_dependencies(gnss_system_parameters glog-${glog_RELEASE})

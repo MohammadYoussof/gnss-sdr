@@ -35,15 +35,14 @@
 #ifndef GNSS_SDR_CHANNEL_H_
 #define GNSS_SDR_CHANNEL_H_
 
+#include <memory>
 #include <string>
 #include <gnuradio/msg_queue.h>
+#include <gnuradio/block.h>
 #include "channel_interface.h"
-#include "gps_l1_ca_channel_fsm.h"
-#include "control_message_factory.h"
-#include "concurrent_queue.h"
-#include "gnss_signal.h"
+#include "channel_fsm.h"
 #include "gnss_synchro.h"
-
+#include "channel_msg_receiver_cc.h"
 
 class ConfigurationInterface;
 class AcquisitionInterface;
@@ -58,11 +57,12 @@ class TelemetryDecoderInterface;
  */
 class Channel: public ChannelInterface
 {
+
 public:
     //! Constructor
     Channel(ConfigurationInterface *configuration, unsigned int channel,
-            GNSSBlockInterface *pass_through, AcquisitionInterface *acq,
-            TrackingInterface *trk, TelemetryDecoderInterface *nav,
+            std::shared_ptr<GNSSBlockInterface> pass_through, std::shared_ptr<AcquisitionInterface> acq,
+            std::shared_ptr<TrackingInterface> trk, std::shared_ptr<TelemetryDecoderInterface> nav,
             std::string role, std::string implementation,
             boost::shared_ptr<gr::msg_queue> queue);
     //! Virtual destructor
@@ -77,39 +77,30 @@ public:
     std::string implementation(){ return implementation_; }
     size_t item_size(){ return 0; }
     Gnss_Signal get_signal() const { return gnss_signal_; }
-    AcquisitionInterface* acquisition(){ return acq_; }
-    TrackingInterface* tracking(){ return trk_; }
-    TelemetryDecoderInterface* telemetry(){ return nav_; }
+    std::shared_ptr<AcquisitionInterface> acquisition(){ return acq_; }
+    std::shared_ptr<TrackingInterface> tracking(){ return trk_; }
+    std::shared_ptr<TelemetryDecoderInterface> telemetry(){ return nav_; }
     void start_acquisition();                   //!< Start the State Machine
-    void set_signal(Gnss_Signal gnss_signal_);  //!< Sets the channel GNSS signal
-    void start();                               //!< Start the thread
-    void standby();
-    /*!
-     * \brief Set stop_ to true and blocks the calling thread until
-     * the thread of the constructor has completed
-     */
-    void stop();
+    void set_signal(const Gnss_Signal& gnss_signal_);  //!< Sets the channel GNSS signal
+
+    void msg_handler_events(pmt::pmt_t msg);
+
 
 private:
-    GNSSBlockInterface *pass_through_;
-    AcquisitionInterface *acq_;
-    TrackingInterface *trk_;
-    TelemetryDecoderInterface *nav_;
+    channel_msg_receiver_cc_sptr channel_msg_rx;
+    std::shared_ptr<GNSSBlockInterface> pass_through_;
+    std::shared_ptr<AcquisitionInterface> acq_;
+    std::shared_ptr<TrackingInterface> trk_;
+    std::shared_ptr<TelemetryDecoderInterface> nav_;
     std::string role_;
     std::string implementation_;
     unsigned int channel_;
     Gnss_Synchro gnss_synchro_;
     Gnss_Signal gnss_signal_;
     bool connected_;
-    bool stop_;
-    int message_;
     bool repeat_;
-    GpsL1CaChannelFsm channel_fsm_;
+    ChannelFsm channel_fsm_;
     boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> channel_internal_queue_;
-    boost::thread ch_thread_;
-    void run();
-    void process_channel_messages();
 };
 
 #endif /*GNSS_SDR_CHANNEL_H_*/

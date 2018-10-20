@@ -33,7 +33,7 @@
 #define GNSS_SDR_VITERBI_DECODER_H_
 
 #include <deque>
-#include <iostream>
+#include <cstdio>
 
 /*!
  * \brief Class that implements a Viterbi decoder
@@ -55,7 +55,6 @@ public:
      */
     float decode_block(const double input_c[], int* output_u_int, const int LL);
 
-
     float decode_continuous(const double sym[], const int traceback_depth, int output_u_int[],
             const int nbits_requested, int &nbits_decoded);
 
@@ -63,6 +62,7 @@ private:
     class Prev
     {
     public:
+        int num_states;
         Prev(int states, int t);
         Prev(const Prev& prev);
         Prev& operator=(const Prev& other);

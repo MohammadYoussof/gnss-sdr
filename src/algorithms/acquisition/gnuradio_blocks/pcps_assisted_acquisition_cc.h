@@ -49,15 +49,10 @@
 #define GNSS_SDR_PCPS_ASSISTED_ACQUISITION_CC_H_
 
 #include <fstream>
-#include <queue>
 #include <string>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <gnuradio/block.h>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/gr_complex.h>
 #include <gnuradio/fft/fft.h>
-#include "concurrent_queue.h"
 #include "gnss_synchro.h"
 
 class pcps_assisted_acquisition_cc;
@@ -68,7 +63,7 @@ pcps_assisted_acquisition_cc_sptr;
 pcps_assisted_acquisition_cc_sptr
 pcps_make_assisted_acquisition_cc(int max_dwells, unsigned int sampled_ms,
         int doppler_max, int doppler_min, long freq, long fs_in, int samples_per_ms,
-        boost::shared_ptr<gr::msg_queue> queue, bool dump, std::string dump_filename);
+        bool dump, std::string dump_filename);
 
 /*!
  * \brief This class implements a Parallel Code Phase Search Acquisition.
@@ -82,12 +77,12 @@ private:
     friend pcps_assisted_acquisition_cc_sptr
     pcps_make_assisted_acquisition_cc(int max_dwells, unsigned int sampled_ms,
             int doppler_max, int doppler_min, long freq, long fs_in,
-            int samples_per_ms, boost::shared_ptr<gr::msg_queue> queue, bool dump,
+            int samples_per_ms, bool dump,
             std::string dump_filename);
 
     pcps_assisted_acquisition_cc(int max_dwells, unsigned int sampled_ms,
             int doppler_max, int doppler_min, long freq, long fs_in,
-            int samples_per_ms, boost::shared_ptr<gr::msg_queue> queue, bool dump,
+            int samples_per_ms, bool dump,
             std::string dump_filename);
 
     void calculate_magnitudes(gr_complex* fft_begin, int doppler_shift,
@@ -132,8 +127,6 @@ private:
     float d_doppler_freq;
     float d_input_power;
     float d_test_statistics;
-    boost::shared_ptr<gr::msg_queue> d_queue;
-    concurrent_queue<int> *d_channel_internal_queue;
     std::ofstream d_dump_file;
     int d_state;
     bool d_active;
@@ -223,14 +216,6 @@ public:
      */
     void set_doppler_step(unsigned int doppler_step);
 
-    /*!
-     * \brief Set tracking channel internal queue.
-     * \param channel_internal_queue - Channel's internal blocks information queue.
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue)
-    {
-        d_channel_internal_queue = channel_internal_queue;
-    }
 
     /*!
      * \brief Parallel Code Phase Search Acquisition signal processing.

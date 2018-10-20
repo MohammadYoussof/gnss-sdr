@@ -16,31 +16,22 @@
 # along with GNSS-SDR. If not, see <http://www.gnu.org/licenses/>.
 #
 
+
+set(ACQ_GR_BLOCKS_SOURCES
+    pcps_acquisition_cc.cc
+    pcps_acquisition_sc.cc
+    pcps_multithread_acquisition_cc.cc
+    pcps_assisted_acquisition_cc.cc
+    pcps_acquisition_fine_doppler_cc.cc
+    pcps_tong_acquisition_cc.cc
+    pcps_cccwsr_acquisition_cc.cc
+    pcps_quicksync_acquisition_cc.cc
+    galileo_pcps_8ms_acquisition_cc.cc
+    galileo_e5a_noncoherent_iq_acquisition_caf_cc.cc
+) 
+    
 if(OPENCL_FOUND)
-    set(ACQ_GR_BLOCKS_SOURCES
-            pcps_acquisition_cc.cc
-            pcps_multithread_acquisition_cc.cc
-            pcps_assisted_acquisition_cc.cc
-            pcps_acquisition_fine_doppler_cc.cc
-            pcps_tong_acquisition_cc.cc
-            pcps_cccwsr_acquisition_cc.cc
-            pcps_quicksync_acquisition_cc.cc
-            galileo_pcps_8ms_acquisition_cc.cc
-            galileo_e5a_noncoherent_iq_acquisition_caf_cc.cc
-            pcps_opencl_acquisition_cc.cc # Needs OpenCL
-    )
-else(OPENCL_FOUND)
-    set(ACQ_GR_BLOCKS_SOURCES
-            pcps_acquisition_cc.cc
-            pcps_multithread_acquisition_cc.cc
-            pcps_assisted_acquisition_cc.cc
-            pcps_acquisition_fine_doppler_cc.cc
-            pcps_tong_acquisition_cc.cc
-            pcps_cccwsr_acquisition_cc.cc
-            pcps_quicksync_acquisition_cc.cc
-            galileo_pcps_8ms_acquisition_cc.cc
-            galileo_e5a_noncoherent_iq_acquisition_caf_cc.cc
-    )
+    set(ACQ_GR_BLOCKS_SOURCES ${ACQ_GR_BLOCKS_SOURCES} pcps_opencl_acquisition_cc.cc)
 endif(OPENCL_FOUND)
 
 include_directories(
@@ -52,6 +43,7 @@ include_directories(
      ${GLOG_INCLUDE_DIRS}
      ${GFlags_INCLUDE_DIRS}
      ${GNURADIO_RUNTIME_INCLUDE_DIRS}
+     ${VOLK_GNSSSDR_INCLUDE_DIRS}
 )
 
 
@@ -65,7 +57,11 @@ if(OPENCL_FOUND)
 endif(OPENCL_FOUND)
 
 file(GLOB ACQ_GR_BLOCKS_HEADERS "*.h")
+list(SORT ACQ_GR_BLOCKS_HEADERS)
 add_library(acq_gr_blocks ${ACQ_GR_BLOCKS_SOURCES} ${ACQ_GR_BLOCKS_HEADERS})
 source_group(Headers FILES ${ACQ_GR_BLOCKS_HEADERS}) 
-target_link_libraries(acq_gr_blocks gnss_sp_libs gnss_system_parameters ${GNURADIO_RUNTIME_LIBRARIES} ${GNURADIO_FFT_LIBRARIES} ${VOLK_LIBRARIES} ${OPT_LIBRARIES})
+target_link_libraries(acq_gr_blocks gnss_sp_libs gnss_system_parameters ${GNURADIO_RUNTIME_LIBRARIES} ${GNURADIO_FFT_LIBRARIES} ${VOLK_LIBRARIES} ${VOLK_GNSSSDR_LIBRARIES} ${OPT_LIBRARIES})
 
+if(NOT VOLK_GNSSSDR_FOUND)
+    add_dependencies(acq_gr_blocks volk_gnsssdr_module)
+endif(NOT VOLK_GNSSSDR_FOUND)

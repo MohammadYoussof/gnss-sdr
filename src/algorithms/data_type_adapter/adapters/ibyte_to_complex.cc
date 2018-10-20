@@ -35,39 +35,32 @@
 using google::LogMessage;
 
 IbyteToComplex::IbyteToComplex(ConfigurationInterface* configuration, std::string role,
-        unsigned int in_streams, unsigned int out_streams,
-        boost::shared_ptr<gr::msg_queue> queue) :
+        unsigned int in_streams, unsigned int out_streams) :
                 config_(configuration), role_(role), in_streams_(in_streams),
-                out_streams_(out_streams), queue_(queue)
+                out_streams_(out_streams)
 {
-
     std::string default_input_item_type = "byte";
     std::string default_output_item_type = "gr_complex";
     std::string default_dump_filename = "../data/input_filter.dat";
 
     DLOG(INFO) << "role " << role_;
 
-    input_item_type_ = config_->property(role_ + ".input_item_type",
-                                         default_input_item_type);
+    input_item_type_ = config_->property(role_ + ".input_item_type", default_input_item_type);
 
     dump_ = config_->property(role_ + ".dump", false);
-    dump_filename_ = config_->property(role_ + ".dump_filename",
-                                       default_dump_filename);
+    dump_filename_ = config_->property(role_ + ".dump_filename", default_dump_filename);
 
     size_t item_size = sizeof(gr_complex);
 
-    gr_interleaved_short_to_complex_ = gr::blocks::interleaved_short_to_complex::make();
-    gr_char_to_short_ = gr::blocks::char_to_short::make();
+    gr_interleaved_char_to_complex_ = gr::blocks::interleaved_char_to_complex::make();
 
-    DLOG(INFO) << "data_type_adapter_(" << gr_interleaved_short_to_complex_->unique_id() << ")";
-    DLOG(INFO) << "data_type_adapter_(" << gr_char_to_short_->unique_id() << ")";
+    DLOG(INFO) << "data_type_adapter_(" << gr_interleaved_char_to_complex_->unique_id() << ")";
 
     if (dump_)
         {
             DLOG(INFO) << "Dumping output into file " << dump_filename_;
             file_sink_ = gr::blocks::file_sink::make(item_size, dump_filename_.c_str());
         }
-
 }
 
 
@@ -77,22 +70,18 @@ IbyteToComplex::~IbyteToComplex()
 
 void IbyteToComplex::connect(gr::top_block_sptr top_block)
 {
-	top_block->connect(gr_char_to_short_, 0, gr_interleaved_short_to_complex_ , 0);
-
-
     if (dump_)
         {
-            top_block->connect(gr_interleaved_short_to_complex_, 0, file_sink_, 0);
+            top_block->connect(gr_interleaved_char_to_complex_, 0, file_sink_, 0);
         }
 }
 
 
 void IbyteToComplex::disconnect(gr::top_block_sptr top_block)
 {
-	top_block->disconnect(gr_char_to_short_, 0, gr_interleaved_short_to_complex_ , 0);
     if (dump_)
         {
-            top_block->disconnect(gr_interleaved_short_to_complex_, 0, file_sink_, 0);
+            top_block->disconnect(gr_interleaved_char_to_complex_, 0, file_sink_, 0);
         }
 }
 
@@ -100,14 +89,14 @@ void IbyteToComplex::disconnect(gr::top_block_sptr top_block)
 
 gr::basic_block_sptr IbyteToComplex::get_left_block()
 {
-    return gr_char_to_short_;
+    return gr_interleaved_char_to_complex_;
 }
 
 
 
 gr::basic_block_sptr IbyteToComplex::get_right_block()
 {
-    return gr_interleaved_short_to_complex_;
+    return gr_interleaved_char_to_complex_;
 }
 
 

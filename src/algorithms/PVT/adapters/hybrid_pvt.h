@@ -35,7 +35,6 @@
 #define GNSS_SDR_HYBRID_PVT_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include "pvt_interface.h"
 #include "hybrid_pvt_cc.h"
 
@@ -51,8 +50,7 @@ public:
     HybridPvt(ConfigurationInterface* configuration,
             std::string role,
             unsigned int in_streams,
-            unsigned int out_streams,
-            boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~HybridPvt();
 
@@ -86,12 +84,13 @@ public:
 private:
     hybrid_pvt_cc_sptr pvt_;
     bool dump_;
-    unsigned int fs_in_;
     std::string dump_filename_;
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
+    
+    std::string eph_xml_filename_;
+    bool save_assistance_to_XML();
 };
 
 #endif

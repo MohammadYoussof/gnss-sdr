@@ -33,7 +33,6 @@
 #define GNSS_SDR_GPS_L1_CA_TONG_ACQUISITION_H_
 
 #include <string>
-#include <gnuradio/msg_queue.h>
 #include <gnuradio/blocks/stream_to_vector.h>
 #include "gnss_synchro.h"
 #include "acquisition_interface.h"
@@ -51,7 +50,7 @@ class GpsL1CaPcpsTongAcquisition: public AcquisitionInterface
 public:
     GpsL1CaPcpsTongAcquisition(ConfigurationInterface* configuration,
             std::string role, unsigned int in_streams,
-            unsigned int out_streams, boost::shared_ptr<gr::msg_queue> queue);
+            unsigned int out_streams);
 
     virtual ~GpsL1CaPcpsTongAcquisition();
 
@@ -94,8 +93,7 @@ public:
      */
     void set_threshold(float threshold);
 
-    /*!    bit_transition_flag_ = configuration_->property("Acquisition.bit_transition_flag", false);
-
+    /*!
      * \brief Set maximum Doppler off grid search
      */
     void set_doppler_max(unsigned int doppler_max);
@@ -104,11 +102,6 @@ public:
      * \brief Set Doppler steps for the grid search
      */
     void set_doppler_step(unsigned int doppler_step);
-
-    /*!
-     * \brief Set tracking channel internal queue
-     */
-    void set_channel_queue(concurrent_queue<int> *channel_internal_queue);
 
     /*!
      * \brief Initializes acquisition algorithm.
@@ -127,9 +120,13 @@ public:
 
     /*!
      * \brief Restart acquisition algorithm
-     *///    std::cout << "role " << role_ << std::endl;
-
+     */
     void reset();
+
+    /*!
+     * \brief If state = 1, it forces the block to start acquiring from the first sample
+     */
+    void set_state(int state);
 
 private:
     ConfigurationInterface* configuration_;
@@ -139,15 +136,14 @@ private:
     std::string item_type_;
     unsigned int vector_length_;
     unsigned int code_length_;
-    bool bit_transition_flag_;
     unsigned int channel_;
     float threshold_;
     unsigned int doppler_max_;
     unsigned int doppler_step_;
-    unsigned int shift_resolution_;
     unsigned int sampled_ms_;
     unsigned int tong_init_val_;
     unsigned int tong_max_val_;
+    unsigned int tong_max_dwells_;
     long fs_in_;
     long if_;
     bool dump_;
@@ -157,8 +153,6 @@ private:
     std::string role_;
     unsigned int in_streams_;
     unsigned int out_streams_;
-    boost::shared_ptr<gr::msg_queue> queue_;
-    concurrent_queue<int> *channel_internal_queue_;
 
     float calculate_threshold(float pfa);
 };
